@@ -1,0 +1,49 @@
+.canvas-container {
+	margin: 0 auto;
+}
+
+canvas {
+	width: calc(100% - 10px);
+}
+
+canvas.lower-canvas {
+	background-color: #da4;
+	/* background-image: url(../images/playfield.png); */
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: contain;
+	border: 3px double #000;
+	z-index: 0;
+}
+
+[hidden] {
+	display: none;
+}
+
+button {
+	background: transparent;
+	bottom: 0;
+	cursor: pointer;
+	font-size: 20px;
+	position: absolute;
+}
+
+.help-button {
+	left:  0;
+}
+
+.music-button {
+	right: 0;
+}
+
+.fullscreen {
+	background: #ddd;
+	border: 1px solid #333;
+	bottom: 15px;
+	left: 15px;
+	opacity: 0.95;
+	overflow: scroll;
+	position: fixed;
+	right: 15px;
+	top: 15px;
+}
