@@ -47,7 +47,7 @@ module.exports.listen = function(app) {
 		});
 
 		socket.on("disconnect", function() {
-			console.log("Your opponent disconnected. Waiting 10 seconds to see if they reconnect, before they automatically forfeit the match.");
+			// console.log("Your opponent disconnected. Waiting 10 seconds to see if they reconnect, before they automatically forfeit the match.");
 			playerDisconnectedFromMatch(socket);
 		});
 
