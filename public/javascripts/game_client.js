@@ -12,8 +12,9 @@ socket.on("enter match", function() {
 	enterMatch();
 });
 
-socket.on("draw cards", function(cards) {
-	updateCards(cards);
+socket.on("draw hand", function(cards) {
+	console.log('io: draw hand --> startRound()');
+	startRound(cards);
 });
 
 socket.on("card played", function() {
@@ -42,6 +43,8 @@ socket.on("no rematch", function() {
 	}
 });
 
+document.addEventListener('event:play-card', playCard);
+
 //////////  Functions  \\\\\\\\\\
 function enterQueue() {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
@@ -68,20 +71,10 @@ function enterMatch() {
 	displayCardSlots = true;
 }
 
-function updateCards(cards) {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	for (var i = 0; i < cards.length; i++) {
-		handSlots[i].card = cards[i];
-	}
-	canPlayCard = true;
-}
+function playCard(evt) {
+	if (debugMode) console.log("event:play-card", evt.detail);
 
-function playCard(index) {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	if (canPlayCard) {
-		socket.emit("play card", index);
-		canPlayCard = false;
-	}
+	socket.emit("play card", evt.detail.cardIndex, evt.detail.location);
 }
 
 function cardPlayed() {

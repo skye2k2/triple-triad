@@ -17,6 +17,8 @@ let timerDuration = 22;
 // |   1   |   |   |   |
 // |   2   |   |   |   |
 
+let emptySpace = {color: null, card: null};
+
 let emptyBoard = [
 	[{color: null, card: null}, {color: null, card: null}, {color: null, card: null}],
 	[{color: null, card: null}, {color: null, card: null}, {color: null, card: null}],
@@ -35,11 +37,17 @@ module.exports.listen = function(app) {
 			deck: undefined
 		});
 
+		// BEGIN TESTING ONLY: IMMEDIATELY START GAME
+		enterQueue(socket);
+		// END TESTING ONLY
+
 		socket.on("reconnect", function() {
-			console.log("TODO: IMPLEMENT THIS SO THAT A PAGE REFRESH DOES NOT MEAN A FORFEIT");
+			console.log("TODO: IMPLEMENT RECONNECT SO THAT A PAGE REFRESH DOES NOT MEAN A FORFEIT");
+			console.log("See if we still have the match data, and can rebuild the board and player's hand from the game log.");
 		});
 
 		socket.on("disconnect", function() {
+			console.log("Your opponent disconnected. Waiting 10 seconds to see if they reconnect, before they automatically forfeit the match.");
 			playerDisconnectedFromMatch(socket);
 		});
 
@@ -66,37 +74,37 @@ module.exports.listen = function(app) {
 	return io;
 };
 
-function updateGameTimers() {
-	// log(arguments)
-	for (var i = 0; i < matches.length; i++) {
-		if (matches[i].timerActive) {
-			matches[i].timer -= 1;
-			if (matches[i].timer === 0) {
-				timesup(matches[i]);
-			}
-		}
-	}
-	setTimeout(updateGameTimers, 1000);
-}
+// function updateGameTimers() {
+// 	log(arguments)
+// 	for (var i = 0; i < matches.length; i++) {
+// 		if (matches[i].timerActive) {
+// 			matches[i].timer -= 1;
+// 			if (matches[i].timer === 0) {
+// 				timesup(matches[i]);
+// 			}
+// 		}
+// 	}
+// 	setTimeout(updateGameTimers, 1000);
+// }
 
-function timesup(match) {
-	log(arguments)
-	match.timerActive = false;
-	match.timer = timerDuration;
-	if (match.players[0].cur) {
-		if (match.players[1].cur) {
-			calculateResult(match);
-		} else {
-			processRound(match, false, match.players[0]);
-		}
-	} else {
-		if (match.players[1].cur) {
-			processRound(match, false, match.players[1]);
-		} else {
-			processRound(match, true, match.players[0]);
-		}
-	}
-}
+// function timesup(match) {
+// 	log(arguments)
+// 	match.timerActive = false;
+// 	match.timer = timerDuration;
+// 	if (match.players[0].cur) {
+// 		if (match.players[1].cur) {
+// 			calculateResult(match);
+// 		} else {
+// 			processRound(match, false, match.players[0]);
+// 		}
+// 	} else {
+// 		if (match.players[1].cur) {
+// 			processRound(match, false, match.players[1]);
+// 		} else {
+// 			processRound(match, true, match.players[0]);
+// 		}
+// 	}
+// }
 
 function log(arguments) {
 	if (debugMode) {
@@ -144,9 +152,10 @@ function createMatch(participants) {
 	log(arguments)
 
 	let id = createId();
-	let startingPlayer = (Math.floor(Math.random() * 2) == 0);
+	let startingPlayer = (Math.floor(Math.random() * 2) === 0)? 0 : 1;
 	let match = {
-		board: emptyBoard,
+		board: JSON.parse(JSON.stringify(emptyBoard)),
+		roundNumber: 1,
 		roundStrength: {
 			red: 5,
 			blue: 5
@@ -178,6 +187,7 @@ function createMatch(participants) {
 	}
 	matches.push(match);
 	io.to(id).emit("enter match");
+	match.log.push(`Begin Round ${match.roundNumber}`);
 	match.timerActive = true;
 }
 
@@ -269,7 +279,7 @@ function calculateResult(match, coords) {
 
 	let gameSpaces = 0;
 	let filledSpaces = 0;
-	emptyBoard.map((row) => {row.map((space) => {gameSpaces++; if (space.color) { filledSpaces++; }});});
+	match.board.map((row) => {row.map((space) => {gameSpaces++; if (space.color) { filledSpaces++; }});});
 
 	if (filledSpaces === gameSpaces) {
 		processRound(match);
@@ -284,7 +294,7 @@ function attack(match, coords, attackingDirection) {
 	// Determine if there is a card in the direction attacked
 	switch (attackingDirection) {
 		case 'north':
-			defendingLocation = board[coords[0] - 1][coords[1]] || false;
+			defendingLocation = (coords[0] - 1 in board) ? board[coords[0] - 1][coords[1]] : false || false;
 			defendingDirection = 'south';
 			break;
 		case 'east':
@@ -292,7 +302,7 @@ function attack(match, coords, attackingDirection) {
 			defendingDirection = 'west';
 			break;
 		case 'south':
-			defendingLocation = board[coords[0] + 1][coords[1]] || false;
+			defendingLocation = (coords[0] + 1 in board) ? board[coords[0] + 1][coords[1]] : false || false;
 			defendingDirection = 'north';
 			break;
 		case 'west':
@@ -307,11 +317,11 @@ function attack(match, coords, attackingDirection) {
 	if (defendingLocation && defendingLocation.color !== attackingLocation.color) {
 		// Only the card played can flip, if its power is greater than the defending card(s).
 		if (match.rules === "BASIC") {
-			if (cardToCheck && card[attackingDirection] > defendingLocation.card[defendingDirection]) {
+			if (defendingLocation.card && attackingLocation.card[attackingDirection] > defendingLocation.card[defendingDirection]) {
 				match.roundStrength[attackingLocation.color]++;
 				match.roundStrength[defendingLocation.color]--;
 				defendingLocation.color = attackingLocation.color;
-				match.log.append(` - Capture: ${attackingLocation.color}: ${location}: ${defendingLocation.card.name}`);
+				match.log.push(` - ${attackingLocation.color} capture: ${attackingDirection}: ${defendingLocation.card.name}`);
 			}
 		// TODO: equal values can flip on the initial placement, and then flipped cards can "combo", flipping additional cards if they are more powerful.
 		} else if (match.rules === "SAME") {
@@ -320,51 +330,57 @@ function attack(match, coords, attackingDirection) {
 }
 
 function processRound(match) {
+	match.log.push(`End Round ${match.roundNumber}`);
+
 	log(arguments)
 	let redRoundScore = match.roundStrength.red;
 	let blueRoundScore = match.roundStrength.blue;
+
+	if (redRoundScore === blueRoundScore) {
+		// Immediately play another round, with each player taking the cards they currently own on the board (PRETTY SURE THERE IS SOMETHING BROKEN ABOUT THIS)
+		// tiebreaker(match);
+	} else if (redRoundScore > blueRoundScore) {
+		match.log.push(`red win round: (${redRoundScore} - ${blueRoundScore})`);
+		match.scoreboard.red++;
+	} else if (blueRoundScore > redRoundScore) {
+		match.log.push(`blue win round: (${blueRoundScore} - ${redRoundScore})`);
+		match.scoreboard.blue++;
+	}
+
 	let redTotalScore = match.scoreboard.red;
 	let blueTotalScore = match.scoreboard.blue;
 
-	if (redRoundScore === blueRoundScore) {
-		// Immediately play another round, with each player taking the cards they currently own on the board
-		tiebreaker(match);
-	} else if (redRoundScore > blueRoundScore) {
-		match.log.append(`red: Win Round (${redRoundScore} - ${blueRoundScore})`);
-		redTotalScore++;
-	} else if (blueRoundScore > redRoundScore) {
-		match.log.append(`blue: Win Round (${blueRoundScore} - ${redRoundScore})`);
-		blueTotalScore++;
-	}
-
-	var matchResults = {
-		tied: tied,
-		winner: {
-			socketId: winner.socket.id,
-			points: winner.points
-		},
-		loser: {
-			socketId: loser.socket.id,
-			points: loser.points
-		}
-	};
-	io.to(match.matchId).emit("round result", matchResults);
+	// var matchResults = {
+	// 	tied: tied,
+	// 	winner: {
+	// 		socketId: winner.socket.id,
+	// 		points: winner.points
+	// 	},
+	// 	loser: {
+	// 		socketId: loser.socket.id,
+	// 		points: loser.points
+	// 	}
+	// };
+	// io.to(match.matchId).emit("round result", matchResults);
 
 	// Check if game is over, otherwise start the next round
 	if (redTotalScore === 2) {
-		match.log.append(`red: Win Game (${redTotalScore} - ${blueTotalScore})`);
-		endMatch(match);
+		match.log.push(`red: WIN GAME (${redTotalScore} - ${blueTotalScore})`);
+		endMatch(match, match.players[0]); // TODO: RETRIEVE THE CORRECT SOCKET
 	} else if (blueTotalScore === 2) {
-		match.log.append(`blue: Win Game (${blueTotalScore} - ${redTotalScore})`);
-		endMatch(match);
+		match.log.push(`blue: WIN GAME (${blueTotalScore} - ${redTotalScore})`);
+		endMatch(match, match.players[0]); // TODO: RETRIEVE THE CORRECT SOCKET
 	} else {
 		startNewRound(match);
 	}
+	console.log(match);
 }
 
 function startNewRound(match) {
 	log(arguments)
-	match.board = emptyBoard;
+	match.roundNumber++;
+	match.log.push(`Begin Round ${match.roundNumber}`);
+	match.board = JSON.parse(JSON.stringify(emptyBoard));
 	match.roundStrength = {red: 5, blue: 5}
 
 	for (var i = 0; i < match.players.length; i++) {
@@ -383,8 +399,8 @@ function startNewRound(match) {
 			player.deck = generateDeck(powerDeckDistribution);
 		}
 		dealHand(player);
+		player.socket.emit("draw hand", player.cards);
 	}
-	// SEND UPDATE OUT TO PLAYERS
 }
 
 function tiebreaker(match) {
@@ -392,9 +408,10 @@ function tiebreaker(match) {
 		match.players[i].activePlayer = !match.players[i].activePlayer;
 		let playerColor = match.players[i].color;
 
-		// Loop through board, and give each player the cards they currently own
-		// match.players[i].cards.push(foundCard);
+		// Loop through board and give each player the cards they currently own
+		// match.board.map((row) => {row.map((space) => { if (space.color === playerColor) { match.players[i].deck.push(match.board[row][space]); }});});
 	}
+	startNewRound(match);
 }
 
 // Card Management
@@ -419,15 +436,14 @@ function generateDeck(distribution) {
 	for (let [tier, count] of Object.entries(distribution || balancedDeckDistribution)) {
 		for (var i = 0; i < count; i++) {
 			var randomCardIndex = Math.floor(Math.random() * (cards[tier].length));
-			console.log(tier, randomCardIndex, cards[tier][randomCardIndex].name);
+			// console.log(tier, randomCardIndex, cards[tier][randomCardIndex].name);
 			// TODO: Generate random card IDs to discourage cheating
-			// TODO: Avoid duplicates
+			// TODO: Try to avoid duplicates between players
 			deck.push(cards[tier][randomCardIndex]);
 		}
 	}
 
 	shuffleDeck(deck);
-	// console.log(deck);
 	return deck;
 }
 
@@ -437,6 +453,7 @@ function dealHand(playerObject) {
 	for (var i = 0; i < 5; i++) {
 		playerObject.cards[i] = drawCard(playerObject.deck);
 	}
+	// TODO: RE-SORT HAND BY TIER TO HELP PLAYERS OUT
 }
 
 function drawCard(deck) {
@@ -445,13 +462,17 @@ function drawCard(deck) {
 }
 
 function playCard(socket, cardIndex, location) {
-	log(arguments)
+	// log(arguments)
+	console.log('playCard: ', socket.id, `\n cardIndex: ${cardIndex}\n location: ${location}`);
 	let match = findMatchBySocketId(socket.id);
 	if (match) {
 		let player = match.players[match.players[0].socket.id === socket.id ? 0 : 1];
 		let coords = location.split(',');
-		let boardLocation = match.board[coords[0]][coords[1]].card;
-		if (!boardLocation) {
+		// Shift to handle 0-indexed array on server vs 1-indexed locations on client
+		coords[0]--;
+		coords[1]--;
+		let boardLocation = match.board[coords[0]][coords[1]];
+		if (!boardLocation.card) {
 			if (cardIndex >= 0 && cardIndex <= 4) {
 				if (player.cards[cardIndex] !== undefined) {
 					let card = player.cards[cardIndex];
@@ -464,13 +485,15 @@ function playCard(socket, cardIndex, location) {
 					boardLocation.card = card;
 					boardLocation.color = player.color;
 
-					match.log.append(`${player.color}: ${location}: ${card.name}`);
+					match.log.push(`${player.color}: ${location}: ${card.name}`);
+
+					console.log(match.board);
 
 					calculateResult(match, coords);
 				}
 			}
 		} else {
-			// Send back invalid move warning
+			console.warn("INVALID MOVE ATTEMPTED");
 		}
 	}
 }
@@ -485,7 +508,7 @@ function shuffleDeck(deck) {
 }
 
 // Testing
-generateDeck();
+// generateDeck();
 
 // TODO: Have a clean way to set up a mock match, so that we can call all functions without worrying about if the variables are defined, or not
 // We will need to do this via an npm script bound to a client-like implementation

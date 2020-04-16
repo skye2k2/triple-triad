@@ -13,6 +13,7 @@ Built with Node.js and Socket.io.
  - Limit canvas, so you can't throw cards off the screen
  - Add keyboard/controller support
  - Add all extended game rule options (Open, Chain, Plus)
+ - Add hover effect outline for target location when dragging card
  - Store game results
  - Create AI node clients
  - Dynamically create all card content
