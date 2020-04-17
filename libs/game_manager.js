@@ -268,6 +268,10 @@ function removeMatch(match) {
 
 // Round Scoring & Management
 
+/**
+ * @description - After a card is played, determine its effect on the board, and if the board is now full, determine the round winner.
+ * @returns {undefined} - Modifies match data directly.
+ */
 function calculateResult(match, coords) {
 	log(arguments)
 	// let boardTracker = [[true, true, true], [true, true, true], [true, true, true]];
@@ -286,6 +290,10 @@ function calculateResult(match, coords) {
 	}
 }
 
+/**
+ * @description - From the attacking space, determine if any cards need to be flipped.
+ * @returns {undefined} - Modifies match data directly.
+ */
 function attack(match, coords, attackingDirection) {
 	let board = match.board;
 	let attackingLocation = board[coords[0]][coords[1]];
@@ -329,6 +337,10 @@ function attack(match, coords, attackingDirection) {
 	}
 }
 
+/**
+ * @description - After all board slots have been filled, determine round winner, ending match is someone won 2 out of 3.
+ * @returns {undefined} - Modifies match data directly.
+ */
 function processRound(match) {
 	match.log.push(`End Round ${match.roundNumber}`);
 
@@ -376,6 +388,10 @@ function processRound(match) {
 	console.log(match);
 }
 
+/**
+ * @description - Reset round-based flags and values, swap starting players, and deal a new hand to each player.
+ * @returns {undefined} - Modifies match data directly, and EMITS hand to player.
+ */
 function startNewRound(match) {
 	log(arguments)
 	match.roundNumber++;
@@ -403,6 +419,10 @@ function startNewRound(match) {
 	}
 }
 
+/**
+ * @description - If a round is going to end in a draw, have each player pick up the cards they currently own to form a new hand, and play until a winner is decided.
+ * @returns {undefined} - Modifies match data directly, and calls out to start another round.
+ */
 function tiebreaker(match) {
 	for (var i = 0; i < match.players.length; i++) {
 		match.players[i].activePlayer = !match.players[i].activePlayer;
@@ -411,11 +431,16 @@ function tiebreaker(match) {
 		// Loop through board and give each player the cards they currently own
 		// match.board.map((row) => {row.map((space) => { if (space.color === playerColor) { match.players[i].deck.push(match.board[row][space]); }});});
 	}
-	startNewRound(match);
+	startNewRound(match); // TODO: Set a flag to know that this is not really a new round, so we don't increment unnecessarily
 }
 
 // Card Management
 
+
+/**
+ * @description - Create a shuffled deck for a player from all available cards, based on the provided distribution, or one from each tier, if no distribution is provided.
+ * @returns {Array} - An array of available cards to the player.
+ */
 function generateDeck(distribution) {
 	log(arguments)
 	let deck = [];
@@ -447,8 +472,11 @@ function generateDeck(distribution) {
 	return deck;
 }
 
+/**
+ * @description - Deal a player a hand from the cards in their deck.
+ * @returns {undefined} - Modifies match data directly.
+ */
 function dealHand(playerObject) {
-	log(arguments)
 	playerObject.cards = [];
 	for (var i = 0; i < 5; i++) {
 		playerObject.cards[i] = drawCard(playerObject.deck);
@@ -456,11 +484,19 @@ function dealHand(playerObject) {
 	// TODO: RE-SORT HAND BY TIER TO HELP PLAYERS OUT
 }
 
+/**
+ * @description - Pull the top card from the given deck.
+ * @returns {Object} - The card drawn from the player's deck.
+ */
 function drawCard(deck) {
 	log(arguments)
 	return deck.shift();
 }
 
+/**
+ * @description - Play the card at the specified hand index to the specified location.
+ * @returns {undefined} - Modifies match data directly and calls out, if needed.
+ */
 function playCard(socket, cardIndex, location) {
 	// log(arguments)
 	console.log('playCard: ', socket.id, `\n cardIndex: ${cardIndex}\n location: ${location}`);
@@ -498,8 +534,11 @@ function playCard(socket, cardIndex, location) {
 	}
 }
 
+/**
+ * @description - Quickly re-order cards using an efficient pseudo-random method.
+ * @returns {undefined} - Modifies deck parameter in-place.
+ */
 function shuffleDeck(deck) {
-	// log(arguments)
 	// Durstenfeld Shuffle (modified Fisher-Yates, which modifies in-place): https://stackoverflow.com/a/12646864/5334305 https://bost.ocks.org/mike/shuffle/
 	for (let i = deck.length - 1; i > 0; i--) {
 		const j = Math.floor(Math.random() * (i + 1));

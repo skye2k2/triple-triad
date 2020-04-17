@@ -18,8 +18,20 @@ function Label(position, text, size, visible, clickable, disabled, font, callbac
 
 //////////  Canvas  \\\\\\\\\\
 function init() {
-	if (debugMode) console.log("%s(%j)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	canvas = document.getElementById("fabric-canvas");
+	delete canvas;
+	canvas = new fabric.Canvas('fabric-canvas', {
+		// originX: 'center',
+		// originY: 'center',
+		// preserveObjectStacking: true, // This is *supposed* to keep elements from layering stupidly
+		selection: false
+	});
+
+	canvas.on({
+		'object:moving' : movingHandler,
+		'object:modified' : modifiedHandler,
+		// 'object:selected' : flipHandler // TODO: Change this to :flipped
+	});
+
 	ctx = canvas.getContext("2d");
 	handleResize();
 
@@ -33,30 +45,30 @@ function init() {
 	labels["main menu"] = new Label({x: 0.5, y: 0.7}, "Main Menu", 128, false, false, false, labelFont, exitMatch);
 }
 
-function animate() {
-	requestAnimFrame(animate);
-	draw();
-}
-
 //////////  Events  \\\\\\\\\\
 
 
 function handleResize() {
-	if (debugMode) console.log("%s(%j)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
+	let newWidth;
+	let newHeight;
 	if (window.innerWidth < window.innerHeight * aspect) {
-		canvas.width = window.innerWidth * 0.9;
-		canvas.height = window.innerWidth * 0.9 / aspect;
-		r = canvas.width / 1000;
+		newWidth = window.innerWidth * 0.9;
+		newHeight = window.innerWidth * 0.9 / aspect;
+		r = newWidth / 1000;
 	} else {
-		canvas.width = window.innerHeight * 0.9 * aspect;
-		canvas.height = window.innerHeight * 0.9;
-		r = canvas.height * aspect / 1000;
+		newWidth = window.innerHeight * 0.9 * aspect;
+		newHeight = window.innerHeight * 0.9;
+		r = newHeight * aspect / 1000;
 	}
 	cardWidth = 140 * r;
 	cardHeight = cardWidth * 1.4;
 
-	playerCardPosition = {x: canvas.width * 0.17, y: canvas.height * 0.15};
-	opponentCardPosition = {x: canvas.width * 0.83 - cardWidth * 1.5, y: canvas.height * 0.15};
+	canvas.setDimensions({
+		width: newWidth,
+		height: newHeight
+	});
+	canvas.calcOffset();
+	canvas.renderAll();
 }
 
 //////////  Drawing  \\\\\\\\\\
@@ -90,21 +102,11 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-window.requestAnimFrame = (function () {
-	return window.requestAnimationFrame ||
-		window.webkitRequestAnimationFrame ||
-		window.mozRequestAnimationFrame ||
-		window.oRequestAnimationFrame ||
-		window.msRequestAnimationFrame ||
-		function (callback, element) {
-			window.setTimeout(callback, 1000 / 60);
-		};
-})();
-
-var canvas, ctx, horizontalCenter, verticalCenter, clickPos, clickedCard, cardWidth, cardHeight;
-let clickCursor = false;
-let displayCardSlots = false;
-let aspect = 7 / 5; // Play area aspect ratio
+var canvas, clickPos, clickedCard, cardWidth, cardHeight;
+let aspect = 7 / 5; // Play area aspect ratio (width / height)
+let gridSpaces = [];
+let opponentCards = [];
+let playerCards = [];
 let labels = [];
 
 let tierColorMap = [
@@ -122,29 +124,16 @@ let tierColorMap = [
 ];
 
 init();
-animate();
 
 window.addEventListener("resize", handleResize, false);
 setInterval(animateLabels, 300);
 
-var canvas = new fabric.Canvas('fabric-canvas', {
-	// originX: 'center',
-	// originY: 'center',
-	// preserveObjectStacking: true, // This is *supposed* to keep elements from layering stupidly
-	selection: false
-});
-
-canvas.on({
-	'object:moving' : movingHandler,
-	'object:modified' : modifiedHandler,
-	'object:selected' : flipHandler // TODO: Change this to :flipped
-});
-
 // When a card changes colors, give it a 3D-like flip animation
 function flipHandler (evt) {
 	// Scrunching up the element's width does not appear work as expected
+	evt.target.hasBorders = false;
 	evt.target.setShadow({ blur: 7, color: 'rgba(0,0,0,0.3)', offsetX: 12, offsetY: 12 });
-	evt.target.animate({left: evt.target.left - cardWidth / 2, skewX: cardWidth / 5, skewY: cardHeight, width: cardWidth / 2}, {
+	evt.target.animate({left: evt.target.left - cardWidth / 2, skewX: cardWidth / 5, skewY: cardHeight / 2, width: cardWidth / 2}, {
 		duration: 100,
 		easing: fabric.util.ease.easeInExpo,
 		onChange: canvas.renderAll.bind(canvas),
@@ -153,6 +142,7 @@ function flipHandler (evt) {
 	// evt.target.scaleToHeight(2);
 	function undoAnimate () {
 		canvas.renderAll();
+		this.hasBorders = true;
 		this.animate({shadow: '', left: this.left + cardWidth / 2, skewX: 0, skewY: 0, width: cardWidth}, {
 			duration: 100,
 			easing: fabric.util.ease.easeOutExpo,
@@ -193,6 +183,15 @@ function modifiedHandler (evt) {
 	}
 };
 
+function moveCard (cardIndexInHand, cardImageId, location, isOpponent) {
+	let card = opponentCards.pop()
+	card.animate({shadow: '', left: gridSpaces[0].left, top: gridSpaces[0].top}, {
+		duration: 500,
+		easing: fabric.util.ease.easeInOutExpo,
+		onChange: canvas.renderAll.bind(canvas)
+	});
+}
+
 // Render each card in a player's hand
 function renderHand (cards, opponent) {
 	if (!cards) {
@@ -232,6 +231,7 @@ function renderCard (card, slot, opponent) {
 			// Add card data to be used with card placement eventing
 			cardGroup.cardIndex = slot;
 
+			opponentCards[slot] = cardGroup;
 			canvas.add(cardGroup);
 			canvas.renderAll();
 		});
@@ -253,6 +253,7 @@ function renderCard (card, slot, opponent) {
 			// Add card data to be used with card placement eventing
 			cardGroup.cardIndex = slot;
 
+			playerCards[slot] = cardGroup;
 			canvas.add(cardGroup);
 			canvas.renderAll();
 		});
@@ -336,6 +337,7 @@ function renderGameGrid () {
 				// Add grid location data to be used with card placement eventing
 				gridSpaceGroup.location = `${j},${i}`;
 
+				gridSpaces.push(gridSpaceGroup);
 				gridGroupArray.push(gridSpaceGroup);
 				canvas.add(gridSpaceGroup);
 			}
@@ -381,4 +383,10 @@ function startRound (cards, opponentCards) {
 	renderGameGrid();
 	renderHand(cards);
 	renderHand(opponentCards); // Opponent's hand
+
+
+	// TESTING
+	setTimeout(() => {
+		moveCard();
+	}, 500);
 }

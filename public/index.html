@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+Welcome, adventurer!
+-->
 	<head>
 		<meta charset="utf-8" />
 		<title>Triple Triad</title>
@@ -40,6 +43,9 @@
 				color: #fff;
 				cursor: pointer;
 				font-size: 20px;
+				min-height: 1rem;
+				min-width: 1rem;
+				padding: 5px;
 				position: absolute;
 			}
 
@@ -64,6 +70,25 @@
 				top: 15px;
 			}
 
+			[playing] .note-2 {
+				/* The BPM for the Triple Triad song, so that the notes bounce in time with the music :) */
+				animation-delay: 0.865s;
+			}
+
+			[playing] .bounce {
+				animation-duration: 1.73s;
+				animation-iteration-count: infinite;
+				animation-name: bounce;
+				animation-timing-function: ease;
+				display: inline-block;
+			}
+			@keyframes bounce {
+				0%  { transform: scale(1,1) 		 translateY(0); }
+				10%  { transform: scale(.85,1.2) translateY(-4px); }
+				20%  { transform: scale(1,1)     translateY(0); }
+				100% { transform: scale(1,1)     translateY(0); }
+			}
+
 		</style>
 	</head>
 
@@ -79,7 +104,7 @@
 			</section> -->
 
 			<button class="help-button" type="button" title="How To Play Triple Triad" onclick="showHowToPlay()">♕?</button>
-			<button class="music-button" type="button" title="Toggle Music" onclick="toggleMusic()">♫ ♪ ♬</button>
+			<button class="music-button" type="button" title="Toggle Music" onclick="toggleMusic(this)"><span class="note-1 bounce">♪</span>&nbsp;<span class="note-2 bounce">♬</span></button>
 			<div id="how-to-play" class="fullscreen" onclick="hideHowToPlay()" hidden>
 				<h1>How To Play Triple Triad</h1>
 				<p>
@@ -125,18 +150,21 @@
 			// Show the board by default
 			renderGameGrid();
 
+			// TODO: Handle browser HTML5 media play and stop events
 			let music;
-			function toggleMusic () {
+			function toggleMusic (target) {
 				if (!music) {
 					music = new Audio("sound/TripleTriad-LQ.mp3");
-					music.volume = 0.5;
+					music.volume = 0.25;
 					music.play();
+					target.setAttribute('playing', true);
 					music.addEventListener("ended", () => {
 						music.currentTime = 0;
 						music.play();
 					}, false);
 				} else {
 					music.pause();
+					target.removeAttribute('playing');
 					music = null;
 				}
 			}
