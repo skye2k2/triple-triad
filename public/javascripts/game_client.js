@@ -3,9 +3,10 @@
 let socket = io();
 let canPlayCard = false;
 let debugMode = true;
-let playerPoints = [];
-let opponentPoints = [];
-let opponentCard, playerCard, matchWinner, matchEndReason, readyToEnd, timerInterval;
+let playerPoints = 5;
+let opponentPoints = 5;
+let cardEventQueue = [];
+let matchWinner, matchEndReason, readyToEnd, timerInterval;
 
 //////////  Socket Events  \\\\\\\\\\
 socket.on("enter match", function() {
@@ -13,12 +14,20 @@ socket.on("enter match", function() {
 });
 
 socket.on("draw hand", function(cards) {
-	console.log('io: draw hand --> startRound()');
+	console.log('io: draw hand --> canvas.startRound()');
 	startRound(cards);
 });
 
-socket.on("card played", function() {
-	cardPlayed();
+// Object format: {cardIndexInHand: 0, location: '1,1', color: 'red', cardImageId: '104'}
+socket.on("card played", function(moveDetail) {
+	cardEventQueue.push(moveDetail);
+	if (cardEventQueue.length === 1) {
+		cardPlayed();
+	}
+});
+
+socket.on("card flipped", function(flipDetail) {
+	cardFlipped(flipDetail);
 });
 
 socket.on("fight result", function(result) {
@@ -43,7 +52,10 @@ socket.on("no rematch", function() {
 	}
 });
 
+// Catch the canvas play-card event, and send it on to Socket.io
 document.addEventListener('event:play-card', playCard);
+
+// TODO: Catch the canvas start match/rematch events, and send on to Socket.io
 
 //////////  Functions  \\\\\\\\\\
 function enterQueue() {
@@ -56,8 +68,10 @@ function enterQueue() {
 
 function enterMatch() {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	playerPoints = [];
-	opponentPoints = [];
+	playerPoints = 5;
+	opponentPoints = 5;
+	cardEventQueue = [];
+
 	labels["result"].visible = false;
 	labels["main menu"].visible = false;
 	labels["main menu"].clickable = false;
@@ -78,8 +92,37 @@ function playCard(evt) {
 }
 
 function cardPlayed() {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	opponentCard = {isUnknown: true};
+	if (isRenderComplete() && cardEventQueue.length) {
+		moveDetail = cardEventQueue.shift();
+		console.log(`cardPlayed --> canvas.moveCard(${JSON.stringify(moveDetail)})`);
+		if (moveDetail) {
+			moveCard(moveDetail);
+		}
+		setTimeout(() => {
+			cardPlayed();
+		}, 600);
+	} else {
+		setTimeout(() => {
+			cardPlayed();
+		}, 600);
+	}
+}
+
+function cardFlipped() {
+	if (isRenderComplete() && cardEventQueue.length) {
+		flipDetail = cardEventQueue.shift();
+		console.log(`cardFlipped --> canvas.flipCard(${JSON.stringify(flipDetail)})`);
+		if (flipDetail) {
+			moveCard(flipDetail);
+		}
+		setTimeout(() => {
+			cardFlipped();
+		}, 600);
+	} else {
+		setTimeout(() => {
+			cardFlipped();
+		}, 600);
+	}
 }
 
 function displayResult(result) {
@@ -95,14 +138,11 @@ function displayResult(result) {
 	}
 	playerPoints = player.points;
 	opponentPoints = opponent.points;
-	opponentCard = opponent.card;
 	setTimeout(function() {
 		if (readyToEnd) {
 			endMatch();
 		} else {
 			canPlayCard = true;
-			opponentCard = undefined;
-			playerCard = undefined;
 			timerInterval = setInterval(updateTimer, 1000);
 			canPlayCard = true;
 			socket.emit("request cards update");
@@ -114,8 +154,6 @@ function endMatch() {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
 	canPlayCard = false;
 	readyToEnd = false;
-	opponentCard = undefined;
-	playerCard = undefined;
 	displayCardSlots = false;
 	for (var i = 0; i < handSlots.length; i++) {
 		handSlots[i].card = undefined;

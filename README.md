@@ -50,6 +50,6 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Add minimal analytics (number of players/matches/final score)
 - Add fun Final Fantasy VIII facts to push to clients while waiting for a game
 - Track stats (plays/captures/losses per card)?
-- Permanently store game results
+- Permanently store game results (which would enable replays)
 - Dynamically create all card content (power numbers, name, border)
 - Add support and options for Final Fantasy XIV cards and modes

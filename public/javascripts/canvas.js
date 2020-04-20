@@ -102,13 +102,15 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-var canvas, clickPos, clickedCard, cardWidth, cardHeight;
+var canvas, cardWidth, cardHeight;
 let aspect = 7 / 5; // Play area aspect ratio (width / height)
 let gridSpaces = [];
+let gridCards = [];
 let opponentCards = [];
 let playerCards = [];
 let labels = [];
 
+// PROBABLY REMOVE THIS SPECIAL TREATMENT, AS IT SEEMS UNNECESSARY
 let tierColorMap = [
 	'', // There is no tier 0
 	'#24b',
@@ -128,29 +130,6 @@ init();
 window.addEventListener("resize", handleResize, false);
 setInterval(animateLabels, 300);
 
-// When a card changes colors, give it a 3D-like flip animation
-function flipHandler (evt) {
-	// Scrunching up the element's width does not appear work as expected
-	evt.target.hasBorders = false;
-	evt.target.setShadow({ blur: 7, color: 'rgba(0,0,0,0.3)', offsetX: 12, offsetY: 12 });
-	evt.target.animate({left: evt.target.left - cardWidth / 2, skewX: cardWidth / 5, skewY: cardHeight / 2, width: cardWidth / 2}, {
-		duration: 100,
-		easing: fabric.util.ease.easeInExpo,
-		onChange: canvas.renderAll.bind(canvas),
-		onComplete: undoAnimate.bind(evt.target)
-	});
-	// evt.target.scaleToHeight(2);
-	function undoAnimate () {
-		canvas.renderAll();
-		this.hasBorders = true;
-		this.animate({shadow: '', left: this.left + cardWidth / 2, skewX: 0, skewY: 0, width: cardWidth}, {
-			duration: 100,
-			easing: fabric.util.ease.easeOutExpo,
-			onChange: canvas.renderAll.bind(canvas)
-		});
-	}
-}
-
 // While dragging, disable eventing on the card we are moving so that findTarget triggers on the element beneath us
 function movingHandler (evt) {
 	evt.target.evented = false;
@@ -158,7 +137,7 @@ function movingHandler (evt) {
 	canvas.renderAll.bind(canvas);
 }
 
-// Handle card drag and drop
+// PlayCard: Handle card drag and drop
 function modifiedHandler (evt) {
 	let dropTarget = canvas.findTarget(evt.e);
 
@@ -171,7 +150,10 @@ function modifiedHandler (evt) {
 		});
 		canvas.discardActiveObject(); // Deselect card after playing
 		dropTarget.selectable = false; // Utilize selectable property to indicate full board spaces
-		document.dispatchEvent(new CustomEvent('event:play-card', { detail: { cardIndex: evt.target.cardIndex, location: dropTarget.location }}));
+		document.dispatchEvent(new CustomEvent('event:play-card', { 	detail: {
+			cardIndex: evt.target.cardIndex,
+			location: dropTarget.location
+		}}));
 	} else {
 		// If we are not on top of a valid target, put the card back.
 		evt.target.evented = true;
@@ -183,39 +165,119 @@ function modifiedHandler (evt) {
 	}
 };
 
-function moveCard (cardIndexInHand, cardImageId, location, isOpponent) {
-	let card = opponentCards.pop()
-	card.animate({shadow: '', left: gridSpaces[0].left, top: gridSpaces[0].top}, {
-		duration: 500,
-		easing: fabric.util.ease.easeInOutExpo,
-		onChange: canvas.renderAll.bind(canvas)
+// Given a hand card index and a location, move the given card, also revealing it, if a cardImageId is passed (always, for spectators or opponent's cards)
+function moveCard (moveDetail) {
+	let card = opponentCards.splice(moveDetail.cardIndexInHand, 1, undefined);
+	console.log(opponentCards);
+
+	// TODO: FIGURE: Consider if it is just better to use an object, so that there is no lookup needed, instead of an array
+	let gridIndex;
+	switch (moveDetail.location) {
+		case '1,1':
+			gridIndex = 0;
+			break;
+		case '1,2':
+			gridIndex = 3;
+			break;
+		case '1,3':
+			gridIndex = 6;
+			break;
+		case '2,1':
+			gridIndex = 1;
+			break;
+		case '2,2':
+			gridIndex = 4;
+			break;
+		case '2,3':
+			gridIndex = 7;
+			break;
+		case '3,1':
+			gridIndex = 2;
+			break;
+		case '3,2':
+			gridIndex = 5;
+			break;
+		case '3,3':
+			gridIndex = 8;
+			break;
+		default:
+			console.warn(`WARNING: card move to invalid space (${location}) attempted`);
+			break;
+	}
+
+	if (card.length && gridIndex !== undefined) {
+		// Disable the space that the moved card now occupies
+		gridSpaces[gridIndex].selectable = false;
+		gridCards[gridIndex] = card;
+		card[0].cardImageId = moveDetail.cardImageId;
+		card[0].gridIndex = gridIndex;
+		card[0].animate({shadow: '', left: gridSpaces[gridIndex].left - cardWidth / 2, top: gridSpaces[gridIndex].top}, {
+			duration: 500,
+			easing: fabric.util.ease.easeInOutExpo,
+			onChange: canvas.renderAll.bind(canvas),
+			onComplete: fetchCardFace.bind(card[0])
+		});
+	}
+}
+
+// Swap card face image for card back
+function fetchCardFace () {
+	// debugger;
+	fabric.Image.fromURL(`images/cards/${this.cardImageId}.png`, (img) => {
+		img = img.scaleToWidth(cardWidth);
+		this.addWithUpdate(img);
+		flipCard(this);
+	}, {
+		left: this.left,
+		top: this.top
 	});
 }
 
+// When a card is revealed or changes colors, give it a 3D-like flip animation
+function flipCard (cardToFlip) {
+	// Scrunching up the element's width as part of the animation does not appear to work as expected
+	cardToFlip.hasBorders = false;
+	cardToFlip.setShadow({ blur: 7, color: 'rgba(0,0,0,0.3)', offsetX: 12, offsetY: 12 });
+	cardToFlip.animate({left: cardToFlip.left - cardWidth / 2, skewX: cardWidth / 5, skewY: cardHeight / 3, width: cardWidth / 2}, {
+		duration: 100,
+		easing: fabric.util.ease.easeInExpo,
+		onChange: canvas.renderAll.bind(canvas),
+		onComplete: undoAnimate.bind(cardToFlip)
+	});
+	function undoAnimate () {
+		canvas.renderAll();
+		this.hasBorders = true;
+		this.animate({shadow: '', left: this.left + cardWidth / 2, skewX: 0, skewY: 0, width: cardWidth}, {
+			duration: 100,
+			easing: fabric.util.ease.easeOutExpo,
+			onChange: canvas.renderAll.bind(canvas)
+		});
+	}
+}
+
 // Render each card in a player's hand
-function renderHand (cards, opponent) {
+function renderHand (cards, isOpponent) {
 	if (!cards) {
 		cards = [{}, {}, {}, {}, {}];
-		opponent = true;
+		isOpponent = true;
 	}
 	for (let i = 0; i < cards.length; i++) {
-		renderCard(cards[i], i, opponent);
+		renderCard(cards[i], i, isOpponent);
 	}
 }
 
 // Render card in its specified hand slot
-function renderCard (card, slot, opponent) {
+function renderCard (card, slot, isOpponent) {
 	let baseCardConfig = {
 		borderScaleFactor: 3,
 		hasControls: false,
 		height: cardHeight,
 		// lockSkewingY: true,
-		skewX: 0,
 		width: cardWidth
 	};
 	let cardGroup;
 
-	if (opponent && !card.id) {
+	if (isOpponent && !card.id) {
 		fabric.Image.fromURL(`images/cards/back.png`, (img) => {
 			img = img.scaleToWidth(cardWidth);
 			// In theory, we could invert the opponent's cards
@@ -262,6 +324,7 @@ function renderCard (card, slot, opponent) {
 
 // Create the grid where cards are played
 function renderGameGrid () {
+	gridSpaces = [];
 	let gridBaseConfig = {
 		fill: false,
 		height: cardHeight,
@@ -361,14 +424,14 @@ function renderGameGrid () {
 	renderGameText();
 }
 
-function renderGameText() {
+function renderGameText () {
 	let text = new fabric.Text('Triple Triad', {
 		evented: false,
 		fill: '#333',
 		fontFamily: 'Comic Sans MS, cursive, sans-serif',
 		hasControls: false,
-		left: canvas.width / 2,
-		top: canvas.height / 2,
+		left: canvas.width / 2.05,
+		top: canvas.height / 1.85,
 		originX: 'center',
 		originY: 'center',
 		textAlign: 'center',
@@ -378,15 +441,19 @@ function renderGameText() {
 	canvas.renderAll();
 }
 
+// Keep from attempting to render card plays until the game is set up
+function isRenderComplete () {
+	return playerCards.length && opponentCards.length && gridSpaces.length
+}
+
+// (function render() {
+// 	canvas.renderAll();
+// 	fabric.util.requestAnimFrame(render);
+// })();
+
 function startRound (cards, opponentCards) {
 	canvas.clear();
 	renderGameGrid();
 	renderHand(cards);
-	renderHand(opponentCards); // Opponent's hand
-
-
-	// TESTING
-	setTimeout(() => {
-		moveCard();
-	}, 500);
+	renderHand(); // Opponent's hand
 }

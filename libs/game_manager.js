@@ -195,6 +195,8 @@ function endMatch(match, winner) {
 	log(arguments)
 	io.to(match.matchId).emit("end match", winner.socket.id);
 	match.isOver = true;
+
+	console.log(match);
 }
 
 function findMatchBySocketId(socketId) {
@@ -385,7 +387,6 @@ function processRound(match) {
 	} else {
 		startNewRound(match);
 	}
-	console.log(match);
 }
 
 /**
@@ -393,7 +394,7 @@ function processRound(match) {
  * @returns {undefined} - Modifies match data directly, and EMITS hand to player.
  */
 function startNewRound(match) {
-	log(arguments)
+	console.log(match);
 	match.roundNumber++;
 	match.log.push(`Begin Round ${match.roundNumber}`);
 	match.board = JSON.parse(JSON.stringify(emptyBoard));
@@ -481,7 +482,7 @@ function dealHand(playerObject) {
 	for (var i = 0; i < 5; i++) {
 		playerObject.cards[i] = drawCard(playerObject.deck);
 	}
-	// TODO: RE-SORT HAND BY TIER TO HELP PLAYERS OUT
+	// TODO: RE-SORT HAND BY TIER TO HELP PLAYERS OUT. BUT THEN OPPONENT CARDS JUST NEED TO BE PLAYED FROM THE TOP DOWN, OTHERWISE THE OPPONENT WILL KNOW THE RELATIVE STRENGTH OF THEIR OPPONENT'S REMAINING HAND
 }
 
 /**
@@ -512,7 +513,6 @@ function playCard(socket, cardIndex, location) {
 			if (cardIndex >= 0 && cardIndex <= 4) {
 				if (player.cards[cardIndex] !== undefined) {
 					let card = player.cards[cardIndex];
-					player.cards[cardIndex] = undefined;
 					// TODO: Should be able to do a mod of `player`
 					let opponent = match.players[match.players[0].socket.id !== socket.id ? 0 : 1];
 					player.activePlayer = false;
@@ -522,13 +522,16 @@ function playCard(socket, cardIndex, location) {
 					boardLocation.color = player.color;
 
 					match.log.push(`${player.color}: ${location}: ${card.name}`);
+					opponent.socket.emit("card played", {cardIndexInHand: cardIndex, location: location, color: opponent.color, cardImageId: card.id});
+					player.cards[cardIndex] = undefined;
 
-					console.log(match.board);
+					// console.log(match.board);
 
 					calculateResult(match, coords);
 				}
 			}
 		} else {
+			// This should not happen, if we are updating the game board correctly
 			console.warn("INVALID MOVE ATTEMPTED");
 		}
 	}
@@ -547,7 +550,7 @@ function shuffleDeck(deck) {
 }
 
 // Testing
-// generateDeck();
+
 
 // TODO: Have a clean way to set up a mock match, so that we can call all functions without worrying about if the variables are defined, or not
 // We will need to do this via an npm script bound to a client-like implementation
