@@ -3,19 +3,25 @@
 let socket = io();
 let canPlayCard = false;
 let debugMode = true;
+let playerColor = "";
 let playerPoints = 5;
+let opponentColor = "";
 let opponentPoints = 5;
 let cardEventQueue = [];
 let matchWinner, matchEndReason, readyToEnd, timerInterval;
 
 //////////  Socket Events  \\\\\\\\\\
-socket.on("enter match", function() {
-	enterMatch();
+socket.on("enter match", function(matchDetail) {
+	enterMatch(matchDetail);
 });
 
 socket.on("draw hand", function(cards) {
 	console.log('io: draw hand --> canvas.startRound()');
-	startRound(cards);
+
+	// TODO: Add a way of acknowledging the previous round before starting the next one
+	setTimeout(() => {
+		startRound(cards);
+	}, 1000);
 });
 
 // Object format: {cardIndexInHand: 0, location: '1,1', color: 'red', cardImageId: '104'}
@@ -27,20 +33,22 @@ socket.on("card played", function(moveDetail) {
 });
 
 socket.on("card flipped", function(flipDetail) {
-	cardFlipped(flipDetail);
+	cardEventQueue.push(flipDetail);
+	if (cardEventQueue.length === 1) {
+		cardFlipped();
+	}
+});
+
+socket.on("update strength", function(matchDetail) {
+	updatePlayerStrengthValues(matchDetail);
 });
 
 socket.on("fight result", function(result) {
 	displayResult(result);
 });
 
-socket.on("end match", function(winner, reason) {
-	matchWinner = winner;
-	matchEndReason = reason;
-	readyToEnd = true;
-	if (canPlayCard) {
-		endMatch();
-	}
+socket.on("end match", function(matchDetail) {
+	endMatch(matchDetail);
 });
 
 socket.on("no rematch", function() {
@@ -58,7 +66,7 @@ document.addEventListener('event:play-card', playCard);
 // TODO: Catch the canvas start match/rematch events, and send on to Socket.io
 
 //////////  Functions  \\\\\\\\\\
-function enterQueue() {
+function enterQueue () {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
 	socket.emit("enter queue");
 	labels["play"].visible = false;
@@ -66,32 +74,37 @@ function enterQueue() {
 	labels["searching"].visible = true;
 }
 
-function enterMatch() {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	playerPoints = 5;
-	opponentPoints = 5;
+function enterMatch (matchDetail) {
+	console.log(`enterMatch`);
+	console.dir(matchDetail);
+
+	playerColor = matchDetail.playerColor;
+	opponentColor = matchDetail.opponentColor;
+	playerPoints = matchDetail.roundStrength[playerColor];
+	opponentPoints = matchDetail.roundStrength[opponentColor];
+	// TODO: Add best of three scoreboard, tied to match data
 	cardEventQueue = [];
 
-	labels["result"].visible = false;
-	labels["main menu"].visible = false;
-	labels["main menu"].clickable = false;
-	labels["rematch"].visible = false;
-	labels["rematch"].clickable = false;
-	labels["rematch"].disabled = false;
-	labels["waiting"].visible = false;
-	resetDots(labels["waiting"]);
-	labels["searching"].visible = false;
-	resetDots(labels["searching"]);
-	displayCardSlots = true;
+	// labels["result"].visible = false;
+	// labels["main menu"].visible = false;
+	// labels["main menu"].clickable = false;
+	// labels["rematch"].visible = false;
+	// labels["rematch"].clickable = false;
+	// labels["rematch"].disabled = false;
+	// labels["waiting"].visible = false;
+	// resetDots(labels["waiting"]);
+	// labels["searching"].visible = false;
+	// resetDots(labels["searching"]);
+	// displayCardSlots = true;
 }
 
-function playCard(evt) {
+function playCard (evt) {
 	if (debugMode) console.log("event:play-card", evt.detail);
 
 	socket.emit("play card", evt.detail.cardIndex, evt.detail.location);
 }
 
-function cardPlayed() {
+function cardPlayed () {
 	if (isRenderComplete() && cardEventQueue.length) {
 		moveDetail = cardEventQueue.shift();
 		console.log(`cardPlayed --> canvas.moveCard(${JSON.stringify(moveDetail)})`);
@@ -108,12 +121,13 @@ function cardPlayed() {
 	}
 }
 
-function cardFlipped() {
+// TODO: Look at the impact of having all card events in a single queue (we might be popping off an event meant for the other function)
+function cardFlipped () {
 	if (isRenderComplete() && cardEventQueue.length) {
 		flipDetail = cardEventQueue.shift();
 		console.log(`cardFlipped --> canvas.flipCard(${JSON.stringify(flipDetail)})`);
 		if (flipDetail) {
-			moveCard(flipDetail);
+			flipCard(flipDetail.location);
 		}
 		setTimeout(() => {
 			cardFlipped();
@@ -123,6 +137,12 @@ function cardFlipped() {
 			cardFlipped();
 		}, 600);
 	}
+}
+
+// Any time a card is flipped, the round score values have changed, so update the numbers
+function updatePlayerStrengthValues (matchDetail) {
+	renderPlayerScore(matchDetail.roundStrength[playerColor]);
+	renderPlayerScore(matchDetail.roundStrength[opponentColor], true);
 }
 
 function displayResult(result) {
@@ -150,34 +170,48 @@ function displayResult(result) {
 	}, (2 * 1000));
 }
 
-function endMatch() {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	canPlayCard = false;
-	readyToEnd = false;
-	displayCardSlots = false;
-	for (var i = 0; i < handSlots.length; i++) {
-		handSlots[i].card = undefined;
-	}
+function endMatch(matchDetail) {
+	console.log(`endMatch`);
+	console.dir(matchDetail);
 
-	if (matchEndReason === "player left") {
-		var reason = ["Your opponent", "You"][+(socket.id !== matchWinner)] + " left the match";
-		labels["rematch"].disabled = true;
-		labels["rematch"].clickable = false;
+	let winnerColor = (matchDetail.scoreboard.red > matchDetail.scoreboard.blue) ? 'red' : 'blue';
+	let loserColor = (matchDetail.scoreboard.red > matchDetail.scoreboard.blue) ? 'blue' : 'red';
+	if (playerColor === winnerColor) {
+		alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+	} else if (playerColor === loserColor) {
+		alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
 	} else {
-		var reason = ["Your opponent has", "You have"][+(socket.id === matchWinner)] + " a full set";
-		labels["rematch"].clickable = true;
+		alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 	}
 
-	labels["result"].text = ["You Lose!", "You Win!"][+(socket.id === matchWinner)];
-	labels["result"].visible = true;
-	labels["rematch"].visible = true;
-	labels["main menu"].visible = true;
-	labels["main menu"].clickable = true;
-	matchWinner = undefined;
-	matchEndReason = undefined;
+	// YOU WIN/LOSE DIALOG
+
+	// canPlayCard = false;
+	// readyToEnd = false;
+	// displayCardSlots = false;
+	// for (var i = 0; i < handSlots.length; i++) {
+	// 	handSlots[i].card = undefined;
+	// }
+
+	// if (matchEndReason === "player left") {
+	// 	var reason = ["Your opponent", "You"][+(socket.id !== matchWinner)] + " left the match";
+	// 	labels["rematch"].disabled = true;
+	// 	labels["rematch"].clickable = false;
+	// } else {
+	// 	var reason = ["Your opponent has", "You have"][+(socket.id === matchWinner)] + " a full set";
+	// 	labels["rematch"].clickable = true;
+	// }
+
+	// labels["result"].text = ["You Lose!", "You Win!"][+(socket.id === matchWinner)];
+	// labels["result"].visible = true;
+	// labels["rematch"].visible = true;
+	// labels["main menu"].visible = true;
+	// labels["main menu"].clickable = true;
+	// matchWinner = undefined;
+	// matchEndReason = undefined;
 }
 
-function exitMatch() {
+function exitMatch () {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
 	playerPoints = [];
 	opponentPoints = [];
@@ -194,7 +228,7 @@ function exitMatch() {
 	labels["play"].clickable = true;
 }
 
-function requestRematch() {
+function requestRematch () {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
 	socket.emit("request rematch");
 	labels["rematch"].visible = false;
@@ -202,7 +236,7 @@ function requestRematch() {
 	labels["waiting"].visible = true;
 }
 
-function animateLabels() {
+function animateLabels () {
 	var dotLabels = [labels["waiting"], labels["searching"]];
 	for (var i = 0; i < dotLabels.length; i++) {
 		if (dotLabels[i].visible) {
@@ -211,12 +245,12 @@ function animateLabels() {
 	}
 }
 
-function updateDots(label) {
+function updateDots (label) {
 	var dots = label.text.split(".").length - 1;
 	var newDots = ((dots + 1) % 4);
 	label.text = label.text.slice(0, -3) + Array(newDots + 1).join(".") + Array(3 - newDots + 1).join(" ");
 }
 
-function resetDots(label) {
+function resetDots (label) {
 	label.text = label.text.slice(0, -3) + "...";
 }

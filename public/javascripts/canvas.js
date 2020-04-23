@@ -102,7 +102,7 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-var canvas, cardWidth, cardHeight;
+var canvas, cardWidth, cardHeight, gameNameText, playerScoreText, opponentScoreText;
 let aspect = 7 / 5; // Play area aspect ratio (width / height)
 let gridSpaces = [];
 let gridCards = [];
@@ -150,6 +150,9 @@ function modifiedHandler (evt) {
 		});
 		canvas.discardActiveObject(); // Deselect card after playing
 		dropTarget.selectable = false; // Utilize selectable property to indicate full board spaces
+
+		gridCards[locationToGridIndex(dropTarget.location)] = evt.target;
+
 		document.dispatchEvent(new CustomEvent('event:play-card', { 	detail: {
 			cardIndex: evt.target.cardIndex,
 			location: dropTarget.location
@@ -165,14 +168,9 @@ function modifiedHandler (evt) {
 	}
 };
 
-// Given a hand card index and a location, move the given card, also revealing it, if a cardImageId is passed (always, for spectators or opponent's cards)
-function moveCard (moveDetail) {
-	let card = opponentCards.splice(moveDetail.cardIndexInHand, 1, undefined);
-	console.log(opponentCards);
-
-	// TODO: FIGURE: Consider if it is just better to use an object, so that there is no lookup needed, instead of an array
-	let gridIndex;
-	switch (moveDetail.location) {
+// Translate location string into grid index
+function locationToGridIndex (location) {
+	switch (location) {
 		case '1,1':
 			gridIndex = 0;
 			break;
@@ -201,30 +199,39 @@ function moveCard (moveDetail) {
 			gridIndex = 8;
 			break;
 		default:
-			console.warn(`WARNING: card move to invalid space (${location}) attempted`);
-			break;
+			console.warn(`WARNING: invalid location (${location}) referenced`);
+			return false;
 	}
 
-	if (card.length && gridIndex !== undefined) {
+	return gridIndex;
+}
+
+// Given a hand card index and a location, move the given card, also revealing it, if a cardImageId is passed (always, for spectators or opponent's cards)
+function moveCard (moveDetail) {
+	let card = opponentCards.splice(moveDetail.cardIndexInHand, 1, undefined)[0];
+
+	// TODO: FIGURE: Consider if it is just better to use an object, so that there is no lookup needed, instead of an array
+	let gridIndex = locationToGridIndex(moveDetail.location);
+	if (card && gridIndex !== undefined) {
 		// Disable the space that the moved card now occupies
 		gridSpaces[gridIndex].selectable = false;
 		gridCards[gridIndex] = card;
-		card[0].cardImageId = moveDetail.cardImageId;
-		card[0].gridIndex = gridIndex;
-		card[0].animate({shadow: '', left: gridSpaces[gridIndex].left - cardWidth / 2, top: gridSpaces[gridIndex].top}, {
+		card.cardImageId = moveDetail.cardImageId;
+		card.gridIndex = gridIndex;
+		card.animate({shadow: '', left: gridSpaces[gridIndex].left - cardWidth / 2, top: gridSpaces[gridIndex].top}, {
 			duration: 500,
 			easing: fabric.util.ease.easeInOutExpo,
 			onChange: canvas.renderAll.bind(canvas),
-			onComplete: fetchCardFace.bind(card[0])
+			onComplete: fetchCardFace.bind(card)
 		});
 	}
 }
 
 // Swap card face image for card back
 function fetchCardFace () {
-	// debugger;
 	fabric.Image.fromURL(`images/cards/${this.cardImageId}.png`, (img) => {
 		img = img.scaleToWidth(cardWidth);
+		img.filters = [new fabric.Image.filters.Grayscale()]; // Add flipping filter to every card
 		this.addWithUpdate(img);
 		flipCard(this);
 	}, {
@@ -234,10 +241,32 @@ function fetchCardFace () {
 }
 
 // When a card is revealed or changes colors, give it a 3D-like flip animation
+// Can pass in either a card or its coordinates
 function flipCard (cardToFlip) {
-	// Scrunching up the element's width as part of the animation does not appear to work as expected
+	if (typeof cardToFlip === 'string') {
+		cardToFlip = gridCards[locationToGridIndex(cardToFlip)];
+	}
+
+	if (cardToFlip.color) {
+		cardToFlip.color = (cardToFlip.color === 'red') ? 'blue' : 'red';
+	} else {
+		cardToFlip.color = (playerColor === 'red') ? 'blue' : 'red';
+	}
+
+	let imageToFilter = (cardToFlip._objects && (cardToFlip._objects[1] || cardToFlip._objects[0]));
+
+	if (cardToFlip.color === playerColor) {
+		imageToFilter.applyFilters([]); // Cheap way to clear filters, since we don't know if any filters are currently being applied
+	} else {
+		imageToFilter.applyFilters();
+	}
+
+	// NOTE: Scrunching up the element's width as part of the animation does not appear to work as expected
 	cardToFlip.hasBorders = false;
-	cardToFlip.setShadow({ blur: 7, color: 'rgba(0,0,0,0.3)', offsetX: 12, offsetY: 12 });
+
+	canvas.renderAll();
+
+	cardToFlip.setShadow({ blur: 7, color: 'rgba(0, 0, 0, 0.3)', offsetX: 12, offsetY: 12 });
 	cardToFlip.animate({left: cardToFlip.left - cardWidth / 2, skewX: cardWidth / 5, skewY: cardHeight / 3, width: cardWidth / 2}, {
 		duration: 100,
 		easing: fabric.util.ease.easeInExpo,
@@ -264,6 +293,34 @@ function renderHand (cards, isOpponent) {
 	for (let i = 0; i < cards.length; i++) {
 		renderCard(cards[i], i, isOpponent);
 	}
+
+	restackCanvasElements();
+}
+
+// Cards and board are not guaranteed to load in ascending order, so force it
+function restackCanvasElements () {
+	if (playerCards.length !== 5 && opponentCards !== 5) {
+		setTimeout(() => {
+			restackCanvasElements();
+		}, 200);
+	} else {
+		console.log(`restackCanvasElements`);
+		for (let i = playerCards.length -1; i >= 0; i--) {
+			if (playerCards[i]) {
+				playerCards[i].sendToBack();
+			}
+		}
+		for (let i = opponentCards.length - 1; i >= 0; i--) {
+			if (opponentCards[i]) {
+				opponentCards[i].sendToBack();
+			}
+		}
+		// Position game grid and text behind all other game components
+		gameNameText.sendToBack();
+		for (let i = 0; i < gridSpaces.length; i++) {
+			gridSpaces[i].sendToBack();
+		}
+	}
 }
 
 // Render card in its specified hand slot
@@ -276,6 +333,8 @@ function renderCard (card, slot, isOpponent) {
 		width: cardWidth
 	};
 	let cardGroup;
+
+	if (!card) {return console.log(`ERROR rendering card[${slot}] for ${(isOpponent) ? 'opponent' : 'player'}`);}
 
 	if (isOpponent && !card.id) {
 		fabric.Image.fromURL(`images/cards/back.png`, (img) => {
@@ -293,6 +352,8 @@ function renderCard (card, slot, isOpponent) {
 			// Add card data to be used with card placement eventing
 			cardGroup.cardIndex = slot;
 
+			// console.log(`renderCard (opponent): ${slot}`);
+
 			opponentCards[slot] = cardGroup;
 			canvas.add(cardGroup);
 			canvas.renderAll();
@@ -300,7 +361,7 @@ function renderCard (card, slot, isOpponent) {
 	} else {
 		fabric.Image.fromURL(`images/cards/${card.id}.png`, (img) => {
 			img = img.scaleToWidth(cardWidth);
-
+			img.filters = [new fabric.Image.filters.Grayscale()]; // Add flipping filter to every card
 			cardGroup = new fabric.Group([ img ], Object.assign({
 				// backgroundColor: tierColorMap[card.tier] // AFTER CARDS HAVE TRANSPARENT BACKGROUNDS
 				borderColor: tierColorMap[card.tier],
@@ -314,6 +375,8 @@ function renderCard (card, slot, isOpponent) {
 
 			// Add card data to be used with card placement eventing
 			cardGroup.cardIndex = slot;
+
+			// console.log(`renderCard (player): ${slot}`);
 
 			playerCards[slot] = cardGroup;
 			canvas.add(cardGroup);
@@ -437,7 +500,41 @@ function renderGameText () {
 		textAlign: 'center',
 	});
 	text = text.scaleToWidth(cardWidth * 2.5);
+	gameNameText = text;
 	canvas.add(text);
+	canvas.renderAll();
+}
+
+function renderPlayerScore (score, isOpponent) {
+	score = score.toString();
+
+	let text = new fabric.Text(score, {
+		evented: false,
+		fill: '#333',
+		fontFamily: 'Comic Sans MS, cursive, sans-serif',
+		hasControls: false,
+		left: (isOpponent) ? canvas.width - cardWidth / 2 : cardWidth / 2,
+		top: 0,
+		originX: 'center',
+		originY: 'top',
+		textAlign: 'center',
+	});
+	text = text.scaleToWidth(cardWidth / 3);
+	if (isOpponent) {
+		if (opponentScoreText) {
+			opponentScoreText.text = score;
+		} else {
+			opponentScoreText = text;
+			canvas.add(text);
+		}
+	} else {
+		if (playerScoreText) {
+			playerScoreText.text = score;
+		} else {
+			playerScoreText = text;
+			canvas.add(text);
+		}
+	}
 	canvas.renderAll();
 }
 
@@ -452,8 +549,14 @@ function isRenderComplete () {
 // })();
 
 function startRound (cards, opponentCards) {
+	playerCards = [];
+	playerScoreText = null;
+	opponentCards = [];
+	opponentScoreText = null;
 	canvas.clear();
 	renderGameGrid();
 	renderHand(cards);
 	renderHand(); // Opponent's hand
+	renderPlayerScore(5);
+	renderPlayerScore(5, true); // Opponent's round score
 }
