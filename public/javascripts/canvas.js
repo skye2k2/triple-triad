@@ -102,7 +102,7 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-var canvas, cardWidth, cardHeight, gameNameText, playerScoreText, opponentScoreText;
+var canvas, cardWidth, cardHeight, gameNameText, playerScoreText, opponentScoreText, stoplight;
 let aspect = 7 / 5; // Play area aspect ratio (width / height)
 let gridSpaces = [];
 let gridCards = [];
@@ -304,7 +304,7 @@ function restackCanvasElements () {
 			restackCanvasElements();
 		}, 200);
 	} else {
-		console.log(`restackCanvasElements`);
+		// console.log(`restackCanvasElements`);
 		for (let i = playerCards.length -1; i >= 0; i--) {
 			if (playerCards[i]) {
 				playerCards[i].sendToBack();
@@ -514,6 +514,7 @@ function renderPlayerScore (score, isOpponent) {
 		fontFamily: 'Comic Sans MS, cursive, sans-serif',
 		hasControls: false,
 		left: (isOpponent) ? canvas.width - cardWidth / 2 : cardWidth / 2,
+		strokeWidth: 0.5,
 		top: 0,
 		originX: 'center',
 		originY: 'top',
@@ -525,6 +526,7 @@ function renderPlayerScore (score, isOpponent) {
 			opponentScoreText.text = score;
 		} else {
 			opponentScoreText = text;
+			opponentScoreText.stroke = opponentColor;
 			canvas.add(text);
 		}
 	} else {
@@ -532,9 +534,66 @@ function renderPlayerScore (score, isOpponent) {
 			playerScoreText.text = score;
 		} else {
 			playerScoreText = text;
+			playerScoreText.stroke = playerColor;
 			canvas.add(text);
 		}
 	}
+	canvas.renderAll();
+}
+
+function renderScoreStoplight (matchDetail = {scoreboard: {}}) {
+	playerScore = matchDetail.scoreboard[playerColor] || playerScore;
+	opponentScore = matchDetail.scoreboard[opponentColor] || opponentScore;
+
+	let circle1 = new fabric.Circle({
+		fill: false,
+		left: 0,
+		radius: cardWidth / 10,
+		stroke: '#000',
+		strokeWidth: 1
+	});
+	let circle2 = new fabric.Circle({
+		fill: false,
+		left: cardWidth / 10 * 2 + 3,
+		radius: cardWidth / 10,
+		stroke: '#000',
+		strokeWidth: 1
+	});
+	let circle3 = new fabric.Circle({
+		fill: false,
+		left: cardWidth / 10 * 4 + 6,
+		radius: cardWidth / 10,
+		stroke: '#000',
+		strokeWidth: 1
+	});
+
+	stoplight = new fabric.Group([ circle1, circle2, circle3 ], {
+		evented: false,
+		hasControls: false,
+		left: canvas.width / 2,
+		opacity: 0.6,
+		originX: 'center',
+		originY: 'top',
+		top: 10
+	});
+
+	canvas.add(stoplight);
+
+	if (playerScore > 0) {
+		stoplight.item(0).set({fill: playerColor});
+
+		if (playerScore > 1) {
+			stoplight.item(1).set({fill: playerColor});
+		}
+	}
+	if (opponentScore > 0) {
+		stoplight.item(2).set({fill: opponentColor});
+
+		if (opponentScore > 1) {
+			stoplight.item(1).set({fill: opponentColor});
+		}
+	}
+
 	canvas.renderAll();
 }
 
@@ -559,4 +618,5 @@ function startRound (cards, opponentCards) {
 	renderHand(); // Opponent's hand
 	renderPlayerScore(5);
 	renderPlayerScore(5, true); // Opponent's round score
+	renderScoreStoplight();
 }

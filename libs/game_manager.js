@@ -383,6 +383,8 @@ function processRound (match) {
 	let redTotalScore = match.scoreboard.red;
 	let blueTotalScore = match.scoreboard.blue;
 
+	io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard});
+
 	// var matchResults = {
 	// 	tied: tied,
 	// 	winner: {

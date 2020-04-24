@@ -10,7 +10,7 @@ Built with Node.js, Socket.io, and FabricJS.
 
 ## Copyright
 
-The game, its rules, characters, and artwork are all copyrighted by Square Enix. The game was designed by Hiroyuki Ito and released as a mini-game plus side quest in Final Fantasy VIII in 1999. The card images used in this adaptation originate from the Bandai CCG released at the same time, unfortunately for many, only in Japan. The music is an adaptation of "Shuffle or Boogie", by SOURCE. The card back design was created by SOURCE for another fan-made implementation of this game.
+The game, its rules, characters, and artwork are all copyrighted by Square Enix. The game was designed by Hiroyuki Ito and released as a mini-game plus side quest in Final Fantasy VIII in 1999. The card images used in this adaptation originate from the Bandai CCG released the same year, unfortunately for many, only in Japan. The music is an adaptation of "Shuffle or Boogie", by [Simple Music](https://soundcloud.com/simple-music-4/final-fantasy-8-triple-triad-remix). The card back design was created by [Karen McCarthy](https://www.artstation.com/artwork/8YZbq) for another fan-made implementation of this game. Slimmed-down how-to-play content taken from [finalfantasy.fandom.com](https://finalfantasy.fandom.com/wiki/Triple_Triad_(Final_Fantasy_VIII)).
 
 ## Changelog:
 
@@ -20,6 +20,8 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 
 - Socket.io implementation for game server, allowing multiple simultaneous matches
 - Drag'n'drop method of playing cards (placement limited to empty board spaces)
+- Opponent cards played move onto board and utilize a flip animation (flipped cards also animate)
+- Opponent cards displayed monochrome
 - HTTP resource compression & caching for a fast experience, while reducing server-side load
 - Board completely drawn by repeating a single corner art image
 - Server-side validation of cards & card placement, to keep things from being too easy for hackers
@@ -28,9 +30,6 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 #### TODO List:
 
 - Only active player can play cards
-- Display current power of players
-- Red/blue ownership of played cards (transparent background, monochrome filter?)
-- Opponent cards played move onto board and utilize a flip animation (flipped cards also animate)
 - Perfectly centered game board and title positioning
 - Add board background art
 - Resize all of the elements in the canvas on page resize

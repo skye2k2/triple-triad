@@ -2,11 +2,14 @@
 
 let socket = io();
 let canPlayCard = false;
-let debugMode = true;
+let debugMode = false;
+let log;
 let playerColor = "";
 let playerPoints = 5;
+let playerScore = 0;
 let opponentColor = "";
 let opponentPoints = 5;
+let opponentScore = 0;
 let cardEventQueue = [];
 let matchWinner, matchEndReason, readyToEnd, timerInterval;
 
@@ -16,7 +19,7 @@ socket.on("enter match", function(matchDetail) {
 });
 
 socket.on("draw hand", function(cards) {
-	console.log('io: draw hand --> canvas.startRound()');
+	debugMode && console.log('io: draw hand --> canvas.startRound()');
 
 	// TODO: Add a way of acknowledging the previous round before starting the next one
 	setTimeout(() => {
@@ -37,6 +40,10 @@ socket.on("card flipped", function(flipDetail) {
 	if (cardEventQueue.length === 1) {
 		cardFlipped();
 	}
+});
+
+socket.on("update score", function(matchDetail) {
+	renderScoreStoplight(matchDetail);
 });
 
 socket.on("update strength", function(matchDetail) {
@@ -76,7 +83,6 @@ function enterQueue () {
 
 function enterMatch (matchDetail) {
 	console.log(`enterMatch`);
-	console.dir(matchDetail);
 
 	playerColor = matchDetail.playerColor;
 	opponentColor = matchDetail.opponentColor;
@@ -99,7 +105,7 @@ function enterMatch (matchDetail) {
 }
 
 function playCard (evt) {
-	if (debugMode) console.log("event:play-card", evt.detail);
+	debugMode && console.log("event:play-card", evt.detail);
 
 	socket.emit("play card", evt.detail.cardIndex, evt.detail.location);
 }
@@ -107,7 +113,7 @@ function playCard (evt) {
 function cardPlayed () {
 	if (isRenderComplete() && cardEventQueue.length) {
 		moveDetail = cardEventQueue.shift();
-		console.log(`cardPlayed --> canvas.moveCard(${JSON.stringify(moveDetail)})`);
+		debugMode && console.log(`cardPlayed --> canvas.moveCard(${JSON.stringify(moveDetail)})`);
 		if (moveDetail) {
 			moveCard(moveDetail);
 		}
@@ -125,7 +131,7 @@ function cardPlayed () {
 function cardFlipped () {
 	if (isRenderComplete() && cardEventQueue.length) {
 		flipDetail = cardEventQueue.shift();
-		console.log(`cardFlipped --> canvas.flipCard(${JSON.stringify(flipDetail)})`);
+		debugMode && console.log(`cardFlipped --> canvas.flipCard(${JSON.stringify(flipDetail)})`);
 		if (flipDetail) {
 			flipCard(flipDetail.location);
 		}
@@ -146,7 +152,7 @@ function updatePlayerStrengthValues (matchDetail) {
 }
 
 function displayResult(result) {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
+	debugMode && console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
 	var player = undefined;
 	var opponent = undefined;
 	if (result.winner.socketId === socket.id) {
@@ -171,20 +177,25 @@ function displayResult(result) {
 }
 
 function endMatch(matchDetail) {
-	console.log(`endMatch`);
-	console.dir(matchDetail);
+	renderScoreStoplight(matchDetail);
+
+	debugMode && console.log(`endMatch`);
+	log = matchDetail.log;
+	console.log(log);
 
 	let winnerColor = (matchDetail.scoreboard.red > matchDetail.scoreboard.blue) ? 'red' : 'blue';
 	let loserColor = (matchDetail.scoreboard.red > matchDetail.scoreboard.blue) ? 'blue' : 'red';
-	if (playerColor === winnerColor) {
-		alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
-	} else if (playerColor === loserColor) {
-		alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
-	} else {
-		alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
-	}
 
-	// YOU WIN/LOSE DIALOG
+	// Wait for any processing animations to complete
+	setTimeout(() => {
+		if (playerColor === winnerColor) {
+			alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+		} else if (playerColor === loserColor) {
+			alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
+		} else {
+			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+		}
+	}, 600);
 
 	// canPlayCard = false;
 	// readyToEnd = false;
