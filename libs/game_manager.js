@@ -451,7 +451,15 @@ function startNewRound (match, tiebreakerRound) {
  */
 function tiebreaker (match) {
 	for (var i = 0; i < match.players.length; i++) {
-		let playerColor = match.players[i].color;
+		let player = match.players[i];
+		let playerColor = player.color;
+
+		// Also give the unplayed card back to its owner
+		for (var j = 0; j < player.cards.length; j++) {
+			if (player.cards[j]) {
+				player.deck.unshift(player.cards[j]);
+			}
+		}
 
 		// Loop through board and give each player the cards they currently own
 		match.board.map((row) => {row.map((space) => { if (space.color === playerColor) {
