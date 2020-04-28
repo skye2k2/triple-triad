@@ -16,12 +16,19 @@ app.use(compression({
 
 // TODO: FIGURE: /socket.io path is not gzipped, but it *is* cached
 
-app.use(express.static(path.join(__dirname, 'public'), {
-	etag: false,
-	immutable: true,
-	lastModified: false,
-	maxAge: 86400000 * 30
-})); // Serve pages static-ly, using directory 'public' as root
+if (process.env.PORT) {
+	app.use(express.static(path.join(__dirname, 'public'), {
+		etag: false,
+		immutable: true,
+		lastModified: false,
+		maxAge: 86400000 * 30
+	})); // Serve pages static-ly, using directory 'public' as root
+} else {
+	app.use(express.static(path.join(__dirname, 'public'), {
+		// DISABLE CACHING WHILE DEVELOPING LOCALLY
+	})); // Serve pages static-ly, using directory 'public' as root
+}
+
 
 const http = require("http").Server(app);
 const io = require('./libs/game_manager').listen(http);  // Start Socket.io server and let game_manager handle those connections
@@ -33,7 +40,7 @@ app.get("/", (req, res) => {
 	// Will serve static pages, no need to handle requests
 });
 
-// If any page not handled already handled (ie. doesn't exists)
+// If any page not handled already handled (ie. doesn't exist)
 app.get("*", (req, res) => {
 	res.status(404).send("Error 404 - Page not found");
 });

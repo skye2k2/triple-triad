@@ -29,13 +29,13 @@ function init() {
 	canvas.on({
 		'object:moving' : movingHandler,
 		'object:modified' : modifiedHandler,
-		// 'object:selected' : flipHandler // TODO: Change this to :flipped
 	});
 
 	ctx = canvas.getContext("2d");
-	handleResize();
 
 	let labelFont = '';
+
+	handleResize();
 
 	labels["play"] = new Label({x: 0.5, y: 0.9}, "Play!", 144, true, true, false, labelFont, enterQueue);
 	labels["searching"] = new Label({x: 0.5, y: 0.9}, "Searching   ", 144, false, false, false, labelFont);
@@ -46,7 +46,6 @@ function init() {
 }
 
 //////////  Events  \\\\\\\\\\
-
 
 function handleResize() {
 	let newWidth;
@@ -63,12 +62,19 @@ function handleResize() {
 	cardWidth = 140 * r;
 	cardHeight = cardWidth * 1.4;
 
+	let oldWidth = canvas.getWidth() || newWidth;
+	let scale = newWidth / oldWidth;
+	zoom  = canvas.getZoom() * scale;
+	// console.log('handleResize', zoom);
+
 	canvas.setDimensions({
 		width: newWidth,
 		height: newHeight
 	});
-	canvas.calcOffset();
-	canvas.renderAll();
+	// canvas.calcOffset();
+	// canvas.renderAll();
+	canvas.setViewportTransform([zoom, 0, 0, zoom, 0, 0]);
+	// TODO: Fix card placement after resizing, so that the horizontal play grid still lines up correctly (multiply left offset by zoom?)
 }
 
 //////////  Drawing  \\\\\\\\\\
@@ -109,6 +115,7 @@ let gridCards = [];
 let opponentCards = [];
 let playerCards = [];
 let labels = [];
+let zoom = 1;
 
 // PROBABLY REMOVE THIS SPECIAL TREATMENT, AS IT SEEMS UNNECESSARY
 let tierColorMap = [
@@ -128,7 +135,6 @@ let tierColorMap = [
 init();
 
 window.addEventListener("resize", handleResize, false);
-setInterval(animateLabels, 300);
 
 // While dragging, disable eventing on the card we are moving so that findTarget triggers on the element beneath us
 function movingHandler (evt) {
