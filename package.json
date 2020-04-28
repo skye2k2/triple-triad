@@ -7,8 +7,7 @@
   "dependencies": {
     "compression": "^1.7.4",
     "express": "~4.13.1",
-    "socket.io": "^1.4.4",
-    "zlib": "^1.0.5"
+    "socket.io": "^1.4.4"
   },
   "scripts": {
     "start": "node server.js"

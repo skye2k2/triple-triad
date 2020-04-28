@@ -195,7 +195,7 @@ function endMatch(matchDetail) {
 		} else {
 			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		}
-	}, 600);
+	}, 700);
 
 	// canPlayCard = false;
 	// readyToEnd = false;

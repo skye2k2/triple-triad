@@ -115,7 +115,7 @@ module.exports = {
 		{tier: 9, id:'096', north: 7, east: 2, south: 7, west: 10, name: 'Phoenix', element: null},
 		{tier: 9, id:'097', north: 10, east: 8, south: 2, west: 6, name: 'Bahamut', element: null},
 		{tier: 9, id:'098', north: 3, east: 1, south: 10, west: 10, name: 'Doomtrain', element: null},
-		{tier: 9, id:'099', north: 1, east: 1, south: 1, west: 1, name: 'Eden', element: null},
+		{tier: 9, id:'099', north: 4, east: 4, south: 9, west: 10, name: 'Eden', element: null},
 	],
 	tier10: [ // characters, A (10), total power < 30
 		{tier: 10, id:'100', north: 10, east: 7, south: 2, west: 8, name: 'Ward', element: null},
