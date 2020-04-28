@@ -24,12 +24,12 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Opponent cards displayed monochrome
 - HTTP resource compression & caching for a fast experience, while reducing server-side load
 - Board completely drawn by repeating and rotating a single corner art image
+- Only active player can play cards
 - Server-side validation of cards & card placement, to keep things from being too easy for hackers
 - Shuffle or Boogie music (remix by: SOURCE), with subtle playing indication (notes bounce in time to the music)
 
 #### TODO List:
 
-- Only active player can play cards
 - Perfectly centered game board and title positioning
 - Add board background art
 - Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)

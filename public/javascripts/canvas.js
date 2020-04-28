@@ -233,6 +233,15 @@ function moveCard (moveDetail) {
 	}
 }
 
+// If you are the active player, enable interaction, otherwise disable
+function enableCards (activePlayer) {
+	if (activePlayer) {
+		canvas.wrapperEl.removeAttribute('disabled');
+	} else {
+		canvas.wrapperEl.setAttribute('disabled', true);
+	}
+}
+
 // Swap card face image for card back
 function fetchCardFace () {
 	fabric.Image.fromURL(`images/cards/${this.cardImageId}.png`, (img) => {
@@ -289,6 +298,22 @@ function flipCard (cardToFlip) {
 		});
 	}
 }
+
+// Render the active player indicator icon
+// function renderActivePlayerIndicator () {
+	// fabric.Image.fromURL(`images/indicator.png`, (img) => {
+	// 	img = img.scaleToWidth(cardWidth / 2);
+	// 	img.top = (canvas.height - 20) / 7 - img.getScaledHeight();
+
+	// 	activePlayerIndicator = img;
+	// 	canvas.add(activePlayerIndicator);
+	// 	canvas.renderAll();
+	// }, {
+	// 	evented: false,
+	// 	hasControls: false,
+	// 	left: canvas.width - (cardWidth + cardWidth / 10)
+	// });
+// }
 
 // Render each card in a player's hand
 function renderHand (cards, isOpponent) {

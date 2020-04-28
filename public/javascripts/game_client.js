@@ -50,6 +50,10 @@ socket.on("update strength", function(matchDetail) {
 	updatePlayerStrengthValues(matchDetail);
 });
 
+socket.on("enable cards", function(activePlayer) {
+	updateActivePlayer(activePlayer);
+});
+
 socket.on("fight result", function(result) {
 	displayResult(result);
 });
@@ -82,7 +86,7 @@ function enterQueue () {
 }
 
 function enterMatch (matchDetail) {
-	console.log(`enterMatch`);
+	debugMode && console.log(`enterMatch`, matchDetail);
 
 	playerColor = matchDetail.playerColor;
 	opponentColor = matchDetail.opponentColor;
@@ -145,6 +149,16 @@ function cardFlipped () {
 	}
 }
 
+function updateActivePlayer (activePlayer) {
+	if (isRenderComplete()) {
+		enableCards(activePlayer);
+	} else {
+		setTimeout(() => {
+			enableCards(activePlayer);
+		}, 600);
+	}
+}
+
 // Any time a card is flipped, the round score values have changed, so update the numbers
 function updatePlayerStrengthValues (matchDetail) {
 	renderPlayerScore(matchDetail.roundStrength[playerColor]);
@@ -188,6 +202,7 @@ function endMatch(matchDetail) {
 
 	// Wait for any processing animations to complete
 	setTimeout(() => {
+		enableCards(true);
 		if (playerColor === winnerColor) {
 			alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		} else if (playerColor === loserColor) {

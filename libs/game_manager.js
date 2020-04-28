@@ -147,12 +147,11 @@ function createId () {
 }
 
 function createMatch (participants) {
-
 	let id = createId();
 	let startingPlayer = (Math.floor(Math.random() * 2) === 0)? 0 : 1;
 	let match = {
 		board: JSON.parse(JSON.stringify(emptyBoard)),
-		roundNumber: 1,
+		roundNumber: 0,
 		roundStrength: {
 			red: 5,
 			blue: 5
@@ -178,17 +177,14 @@ function createMatch (participants) {
 			deck: generateDeck(),
 			cards: []
 		};
-		dealHand(playerObject);
 		match.players.push(playerObject);
-		participants[i].socket.emit("draw hand", playerObject.cards);
 		// TODO: CLEANUP: Just have a single state object that contains all of the round and match information to send to the clients, or a function that assembles the data on-the-fly, to keep duplication down
 		participants[i].socket.emit("enter match", Object.assign({}, { roundStrength: match.roundStrength, scoreboard: match.scoreboard, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red' }));
 		participants[i].socket.join(id);
 	}
 
-	matches.push(match);
 	// io.to(id).emit("enter match"); // This was the old way of starting the match
-	log(`Begin Round ${match.roundNumber}`, match);
+	startNewRound(match);
 	match.timerActive = true;
 
 	// HARD-CODED ANIMATION TESTING
@@ -427,7 +423,6 @@ function startNewRound (match, tiebreakerRound) {
 
 	for (var i = 0; i < match.players.length; i++) {
 		let player = match.players[i];
-		player.activePlayer = !player.activePlayer;
 
 		// If players are out of cards, generate a high-power hand for the final round
 		if (!player.deck.length) {
@@ -443,6 +438,7 @@ function startNewRound (match, tiebreakerRound) {
 		dealHand(player);
 		player.socket.emit("draw hand", player.cards);
 	}
+	toggleActivePlayer(match);
 }
 
 /**
@@ -467,6 +463,19 @@ function tiebreaker (match) {
 		}});});
 	}
 	startNewRound(match, true);
+}
+
+/**
+ * @description - After a card is played, or at the start of a match/round(?), enable/disable player hands, so that only one card can be played at a time, alternating players.
+ * @returns {undefined} - Modifies match data directly, and calls out to players with update.
+ */
+function toggleActivePlayer (match) {
+	console.log(matches);
+	for (var i = 0; i < match.players.length; i++) {
+		let player = match.players[i];
+		player.activePlayer = !player.activePlayer;
+		player.socket.emit("enable cards", player.activePlayer);
+	}
 }
 
 // Card Management
@@ -539,14 +548,12 @@ function playCard (socket, cardIndex, location) {
 		coords[0]--;
 		coords[1]--;
 		let boardLocation = match.board[coords[0]][coords[1]];
-		if (!boardLocation.card) {
+		if (!boardLocation.card && player.activePlayer) {
 			if (cardIndex >= 0 && cardIndex <= 4) {
 				if (player.cards[cardIndex] !== undefined) {
 					let card = player.cards[cardIndex];
 					// TODO: Should be able to do a mod of `player`
 					let opponent = match.players[match.players[0].socket.id !== socket.id ? 0 : 1];
-					player.activePlayer = false;
-					opponent.activePlayer = true;
 
 					boardLocation.card = card;
 					boardLocation.color = player.color;
@@ -554,6 +561,13 @@ function playCard (socket, cardIndex, location) {
 					log(`${player.color}: ${location}: ${card.name}`, match);
 					opponent.socket.emit("card played", {cardIndexInHand: cardIndex, location: location, color: opponent.color, cardImageId: card.id});
 					player.cards[cardIndex] = undefined;
+					// Only toggle the active player if a player still has cards. The active player switches at the start of each round
+					for (let i = 0; i < player.cards.length; i++) {
+						if (player.cards[i]) {
+							toggleActivePlayer(match);
+							break;
+						}
+					}
 
 					// console.log(match.board);
 
@@ -561,8 +575,9 @@ function playCard (socket, cardIndex, location) {
 				}
 			}
 		} else {
-			// This should not happen, if we are updating the game board correctly
+			// The only way this should happen is if a player hacked their CSS to re-enable events on the other player's turn
 			console.warn("INVALID MOVE ATTEMPTED");
+			opponent.socket.emit("undo play", {cardIndexInHand: cardIndex, location: location}); // TODO: IMPLEMENT THIS
 		}
 	}
 }

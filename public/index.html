@@ -16,6 +16,7 @@ Welcome, adventurer!
 
 			.canvas-container {
 				margin: 0 auto;
+				transition: opacity 0.2s;
 			}
 
 			canvas {
@@ -30,6 +31,11 @@ Welcome, adventurer!
 				background-size: contain;
 				border: 3px double #000;
 				z-index: 0;
+			}
+
+			[disabled] {
+				opacity: 0.8;
+				pointer-events: none;
 			}
 
 			[hidden] {
@@ -190,6 +196,15 @@ Welcome, adventurer!
 			function showHowToPlay () {
 				document.querySelector('#how-to-play').removeAttribute('hidden');
 			}
+
+			// Clicks will fall through all the way to the content wrapper, if the canvas is disabled
+			function impatience (evt) {
+				if (evt.target.id === 'content') {
+					alert('Please wait for your opponent to play a card!');
+				}
+			}
+
+			document.getElementById('content').addEventListener('click', impatience);
 		</script>
 	</body>
 </html>

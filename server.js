@@ -19,13 +19,13 @@ app.use(compression({
 if (process.env.PORT) {
 	app.use(express.static(path.join(__dirname, 'public'), {
 		etag: false,
-		immutable: true,
+		immutable: true, // NOTE: This makes it so that no query is even sent to the server for matched requests, if there is a cached version.
 		lastModified: false,
 		maxAge: 86400000 * 30
 	})); // Serve pages static-ly, using directory 'public' as root
 } else {
 	app.use(express.static(path.join(__dirname, 'public'), {
-		// DISABLE CACHING WHILE DEVELOPING LOCALLY
+		// DISABLE FORCED NO-REQUEST CACHING WHILE DEVELOPING LOCALLY
 	})); // Serve pages static-ly, using directory 'public' as root
 }
 
