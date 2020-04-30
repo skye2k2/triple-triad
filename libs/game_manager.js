@@ -184,6 +184,7 @@ function createMatch (participants) {
 	}
 
 	// io.to(id).emit("enter match"); // This was the old way of starting the match
+	matches.push(match);
 	startNewRound(match);
 	match.timerActive = true;
 
@@ -470,7 +471,6 @@ function tiebreaker (match) {
  * @returns {undefined} - Modifies match data directly, and calls out to players with update.
  */
 function toggleActivePlayer (match) {
-	console.log(matches);
 	for (var i = 0; i < match.players.length; i++) {
 		let player = match.players[i];
 		player.activePlayer = !player.activePlayer;
