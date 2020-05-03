@@ -149,6 +149,7 @@ function modifiedHandler (evt) {
 
 	// If we are on top of an *empty* board space, position the card directly on top
 	if (dropTarget && dropTarget.selectable && dropTarget.location) {
+		playSound(play, 50);
 		evt.target.animate({shadow: '', left: dropTarget.left - cardWidth / 2, top: dropTarget.top}, {
 			duration: 100,
 			easing: fabric.util.ease.easeInOutExpo,
@@ -165,6 +166,7 @@ function modifiedHandler (evt) {
 		}}));
 	} else {
 		// If we are not on top of a valid target, put the card back.
+		playSound(play, 200);
 		evt.target.evented = true;
 		evt.target.animate({shadow: '', left: evt.transform.original.left, top: evt.transform.original.top}, {
 			duration: 200,
@@ -296,6 +298,7 @@ function flipCard (cardToFlip) {
 			easing: fabric.util.ease.easeOutExpo,
 			onChange: canvas.renderAll.bind(canvas)
 		});
+		playSound(flip);
 	}
 }
 
@@ -317,6 +320,8 @@ function flipCard (cardToFlip) {
 
 // Render each card in a player's hand
 function renderHand (cards, isOpponent) {
+	playSound(deal);
+
 	if (!cards) {
 		cards = [{}, {}, {}, {}, {}];
 		isOpponent = true;

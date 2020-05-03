@@ -203,12 +203,15 @@ function endMatch(matchDetail) {
 	// Wait for any processing animations to complete
 	setTimeout(() => {
 		enableCards(true);
+		// TODO: Use game status notifications, instead of alerts
 		if (playerColor === winnerColor) {
-			alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+			playSound(fanfare);
+			// alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		} else if (playerColor === loserColor) {
-			alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
+			playSound(loser);
+			// alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
 		} else {
-			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+			// alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		}
 	}, 700);
 

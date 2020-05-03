@@ -170,6 +170,25 @@ Welcome, adventurer!
 			// Show the board by default
 			renderGameGrid();
 
+			// SFX
+
+			// Pre-load SFX
+			deal = new Audio("sound/Deal.mp3");
+			error = new Audio("sound/Error.mp3");
+			flip = new Audio("sound/Flip.mp3");
+			play = new Audio("sound/Play.mp3");
+			fanfare = new Audio("sound/Fanfare.mp3");
+			loser = new Audio("sound/Loser.mp3");
+
+			// Handle playing of sound effects for various game interactions
+			function playSound (effectName, delay = 0) {
+				// TODO: If fanfare and playing music, pause music until complete
+				setTimeout(() => {
+					effectName.play();
+					effectName.currentTime = 0;
+				}, delay);
+			}
+
 			// TODO: Handle browser HTML5 media play and stop events
 			let music;
 			function toggleMusic (target) {
@@ -200,7 +219,9 @@ Welcome, adventurer!
 			// Clicks will fall through all the way to the content wrapper, if the canvas is disabled
 			function impatience (evt) {
 				if (evt.target.id === 'content') {
-					alert('Please wait for your opponent to play a card!');
+					// TODO: Just highlight "Opponent's Turn"
+					// alert('Please wait for your opponent to play a card!');
+					playSound(error);
 				}
 			}
 
