@@ -1,6 +1,6 @@
 // This file manages the games client's logic. It's here that Socket.io connections are handled and functions from canvas.js are used to manage the game's visual appearance.
 
-let ANIMATION_TIME = 750;
+let ANIMATION_TIME = 800;
 let socket = io();
 let canPlayCard = false;
 let debugMode = true;
@@ -132,6 +132,7 @@ function playCard (evt) {
 }
 
 // TODO: FIGURE: A single card event queue works, for now, assuming that events do not come out of order.
+// TODO: BUG: For extended matches, animation time appears to eventually drop to 0, maybe because there are extra cardEvent() calls left over.
 function cardEvent () {
 	if (isRenderComplete() && cardEventQueue.length) {
 		cardEventDetail = cardEventQueue.shift();
@@ -177,7 +178,7 @@ function updateActivePlayer (activePlayer) {
 		enableCards(activePlayer);
 	} else {
 		setTimeout(() => {
-			enableCards(activePlayer);
+			updateActivePlayer(activePlayer);
 		}, ANIMATION_TIME);
 	}
 }
@@ -193,7 +194,7 @@ function updateScores (matchDetail) {
 	// debugMode && console.log(`updateScores: ${JSON.stringify(matchDetail)}`);
 	playerRoundScore = matchDetail.scoreboard[playerColor] || 0;
 	opponentRoundScore = matchDetail.scoreboard[opponentColor] || 0;
-	if (matchDetail.runningScore && (matchDetail.runningScore[playerColor] || matchDetail.runningScore[opponentColor])) {
+	if (matchDetail.runningScore && (!!matchDetail.runningScore[playerColor] || !!matchDetail.runningScore[opponentColor])) {
 		playerRunningScore = matchDetail.runningScore[playerColor] || 0;
 		opponentRunningScore = matchDetail.runningScore[opponentColor] || 0;
 	}
@@ -201,7 +202,7 @@ function updateScores (matchDetail) {
 }
 
 function endMatch (matchDetail) {
-	renderScoreStoplight(); // PROBABLY DON'T NEED THIS
+	updateScores(matchDetail);
 
 	log = matchDetail.log;
 	console.log(log);

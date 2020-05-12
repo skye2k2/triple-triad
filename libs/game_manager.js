@@ -187,8 +187,7 @@ function createMatch (participants) {
 
 	// io.to(id).emit("enter match"); // This was the old way of starting the match
 	matches.push(match);
-	startNewRound(match);
-	match.timerActive = true;
+
 
 	// HARD-CODED REMATCH TESTING
 	// match.matchCount = 3;
@@ -203,8 +202,13 @@ function createMatch (participants) {
 	// setTimeout(() => {
 	// 	match.scoreboard.red = 2;
 	// 	match.scoreboard.blue = 1;
+	// 	match.runningScore.red = 10;
+	// 	match.runningScore.blue = 17;
 	// 	endMatch(match);
 	// }, 2000);
+
+	startNewRound(match);
+	match.timerActive = true;
 }
 
 function endMatch (match) {
@@ -472,7 +476,6 @@ function startNewRound (match, tiebreakerRound) {
 	toggleActivePlayer(match);
 
 	// HARD-CODED MATCH TESTING
-	// BUG: AFTER DOING THIS, WHEN A NEW ROUND STARTS, WE NO LONGER GET OPPONENT CARD PLAY EVENTS...
 	// if (match.roundNumber < 4) {
 	// 	setTimeout(() => {
 	// 		let activePlayer = (match.players[0].activePlayer) ? 0 : 1;

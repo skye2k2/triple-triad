@@ -108,7 +108,7 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-var canvas, cardWidth, cardHeight, gameNameText, playerRoundScoreText, opponentRoundScoreText, stoplight, rematchBlock;
+var canvas, cardWidth, cardHeight, gameNameText, playerRoundStrengthText, playerRunningScoreText, opponentRoundStrengthText, opponentRunningScoreText, noButtonBlock, yesButtonBlock, stoplight, rematchBlock;
 let aspect = 7 / 5; // Play area aspect ratio (width / height)
 let gridSpaces = [];
 let gridCards = [];
@@ -562,22 +562,61 @@ function renderPlayerScore (score, isOpponent) {
 	text = text.scaleToWidth(cardWidth / 3);
 
 	if (isOpponent) {
-		if (opponentRoundScoreText) {
-			opponentRoundScoreText.text = score;
+		if (opponentRoundStrengthText) {
+			opponentRoundStrengthText.text = score;
 		} else {
-			opponentRoundScoreText = text;
-			opponentRoundScoreText.stroke = opponentColor;
+			opponentRoundStrengthText = text;
+			opponentRoundStrengthText.stroke = opponentColor;
 			canvas.add(text);
 		}
 	} else {
-		if (playerRoundScoreText) {
-			playerRoundScoreText.text = score;
+		if (playerRoundStrengthText) {
+			playerRoundStrengthText.text = score;
 		} else {
-			playerRoundScoreText = text;
-			playerRoundScoreText.stroke = playerColor;
+			playerRoundStrengthText = text;
+			playerRoundStrengthText.stroke = playerColor;
 			canvas.add(text);
 		}
 	}
+	canvas.renderAll();
+}
+
+function renderPlayerRunningScore (score = '', isOpponent) {
+	// console.log(`renderPlayerRunningScore ${score}`);
+	score = score.toString();
+
+	let text = new fabric.Text(score, {
+		evented: false,
+		fill: '#333',
+		fontFamily: 'Comic Sans MS, cursive, sans-serif',
+		hasControls: false,
+		left: (isOpponent) ? canvas.width / 2 + cardWidth : canvas.width / 2 - cardWidth,
+		stroke: '#333',
+		strokeWidth: 1,
+		top: 10,
+		originX: 'center',
+		originY: 'top',
+		textAlign: 'center',
+	});
+
+	text = text.scaleToHeight(cardWidth / 4);
+
+	if (isOpponent) {
+		if (opponentRunningScoreText) {
+			opponentRunningScoreText.text = score;
+		} else {
+			opponentRunningScoreText = text;
+			canvas.add(text);
+		}
+	} else {
+		if (playerRunningScoreText) {
+			playerRunningScoreText.text = score;
+		} else {
+			playerRunningScoreText = text;
+			canvas.add(text);
+		}
+	}
+
 	canvas.renderAll();
 }
 
@@ -615,6 +654,7 @@ function renderRematchBlock () {
 
 	yesButtonBlock = new fabric.Group([ yesButton, yesText ], {
 		left: - cardWidth,
+		shadow: { blur: 5, color: 'rgba(0,0,0,0.3)', offsetX: 3, offsetY: 3 },
 		top: text.getScaledHeight() / 2,
 		value: 'yes'
 	});
@@ -641,17 +681,32 @@ function renderRematchBlock () {
 
 	noButtonBlock = new fabric.Group([ noButton, noText ], {
 		left: cardWidth,
+		shadow: { blur: 5, color: 'rgba(0,0,0,0.3)', offsetX: 3, offsetY: 3 },
 		top: text.getScaledHeight() / 2,
 		value: 'no'
 	});
 
-	rematchBlock = new fabric.Group([ text, noButtonBlock, yesButtonBlock ], {
+	let rematchBackground = new fabric.Rect({
+		fill: '#da4',
+		height: cardWidth * 1.5,
+		left: cardWidth / 2,
+		originX: 'center',
+		originY: 'center',
+		stroke: '#000',
+		strokeWidth: 1,
+		top: cardWidth / 4,
+		width: cardWidth * 4,
+	});
+
+	// TODO: Add a minimize button that animates the rematchBlock down off the screen, and adds a restore dialog button (probably with a refresh symbol, of some sort)
+
+	rematchBlock = new fabric.Group([ rematchBackground, text, noButtonBlock, yesButtonBlock ], {
 		borderColor: 'transparent',
 		hasControls: false,
 		hoverCursor: 'default',
 		left: canvas.width / 2,
 		lockMovementX: true,
-		lockMovementY: true,
+		// lockMovementY: true,
 		originX: 'center',
 		originY: 'center',
 		subTargetCheck: true,
@@ -661,35 +716,44 @@ function renderRematchBlock () {
 	canvas.add(rematchBlock);
 
 	rematchBlock.on('mousedown', function (evt) {
+		// If a button was clicked, fire off an event and add a treatment to know which button was clicked
 		if (evt.subTargets[0] && evt.subTargets[0].value) {
 			document.dispatchEvent(new CustomEvent('event:rematch', { detail: evt.subTargets[0].value }));
+
+			noButtonBlock.setShadow({ blur: 5, color: 'rgba(0,0,0,0.3)', offsetX: 3, offsetY: 3 });
+			yesButtonBlock.setShadow({ blur: 5, color: 'rgba(0,0,0,0.3)', offsetX: 3, offsetY: 3 });
+			evt.subTargets[0].setShadow({ blur: 5, color: 'rgba(0,0,0,0.3)', offsetX: -3, offsetY: -3 });
+			canvas.renderAll();
+
+			if (evt.subTargets[0].value === 'no') {
+				setTimeout(() => {
+					canvas.remove(rematchBlock);
+				}, 500);
+			}
 		}
 	});
 	canvas.renderAll();
 }
 
 function renderScoreStoplight () {
-	let circle1 = new fabric.Circle({
+	let circleBaseConfig = {
 		fill: false,
-		left: 0,
 		radius: cardWidth / 10,
 		stroke: '#000',
 		strokeWidth: 1
-	});
-	let circle2 = new fabric.Circle({
-		fill: false,
-		left: cardWidth / 10 * 2 + 3,
-		radius: cardWidth / 10,
-		stroke: '#000',
-		strokeWidth: 1
-	});
-	let circle3 = new fabric.Circle({
-		fill: false,
-		left: cardWidth / 10 * 4 + 6,
-		radius: cardWidth / 10,
-		stroke: '#000',
-		strokeWidth: 1
-	});
+	};
+
+	let circle1 = new fabric.Circle(Object.assign({
+		left: 0
+	}, circleBaseConfig));
+
+	let circle2 = new fabric.Circle(Object.assign({
+		left: cardWidth / 10 * 2 + 3
+	}, circleBaseConfig));
+
+	let circle3 = new fabric.Circle(Object.assign({
+		left: cardWidth / 10 * 4 + 6
+	}, circleBaseConfig));
 
 	stoplight = new fabric.Group([ circle1, circle2, circle3 ], {
 		evented: false,
@@ -725,7 +789,15 @@ function renderScoreStoplight () {
 		}
 	}
 
-	canvas.renderAll();
+	renderPlayerRunningScore(playerRunningScore);
+	renderPlayerRunningScore(opponentRunningScore, true);
+
+	// BUG: Running scores do not display high enough, despite rendering last, until wrapped in a timeout
+	setTimeout(() => {
+		playerRunningScoreText.bringToFront();
+		opponentRunningScoreText.bringToFront();
+		canvas.renderAll();
+	}, 0);
 }
 
 // Keep from attempting to render card plays until the game is set up
@@ -740,9 +812,9 @@ function isRenderComplete () {
 
 function startRound (cards, opponentCards) {
 	playerCards = [];
-	playerRoundScoreText = null;
+	playerRoundStrengthText = null;
 	opponentCards = [];
-	opponentRoundScoreText = null;
+	opponentRoundStrengthText = null;
 	canvas.clear();
 	renderGameGrid();
 	renderHand(cards);
