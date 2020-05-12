@@ -184,9 +184,12 @@ Welcome, adventurer!
 			function playSound (effectName, delay = 0) {
 				// TODO: If fanfare and playing music, pause music until complete
 				setTimeout(() => {
-					effectName.play();
-					effectName.currentTime = 0;
+					effectName.play().then(() => {
+						effectName.currentTime = 0;
+					}).catch((err) => {/* Just catch the DOMException if the user somehow hasn't interacted with the page, yet */});
+
 				}, delay);
+
 			}
 
 			// TODO: Handle browser HTML5 media play and stop events

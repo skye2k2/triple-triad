@@ -17,6 +17,7 @@ app.use(compression({
 // TODO: FIGURE: /socket.io path is not gzipped, but it *is* cached
 
 if (process.env.PORT) {
+	// TODO: FIGURE: Multiple static routes, so that we can only cache HTML pages for a single day (because phones and force-refresh)
 	app.use(express.static(path.join(__dirname, 'public'), {
 		etag: false,
 		immutable: true, // NOTE: This makes it so that no query is even sent to the server for matched requests, if there is a cached version.

@@ -108,7 +108,7 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-var canvas, cardWidth, cardHeight, gameNameText, playerScoreText, opponentScoreText, stoplight;
+var canvas, cardWidth, cardHeight, gameNameText, playerRoundScoreText, opponentRoundScoreText, stoplight, rematchBlock;
 let aspect = 7 / 5; // Play area aspect ratio (width / height)
 let gridSpaces = [];
 let gridCards = [];
@@ -160,13 +160,13 @@ function modifiedHandler (evt) {
 
 		gridCards[locationToGridIndex(dropTarget.location)] = evt.target;
 
-		document.dispatchEvent(new CustomEvent('event:play-card', { 	detail: {
+		document.dispatchEvent(new CustomEvent('event:play-card', { detail: {
 			cardIndex: evt.target.cardIndex,
 			location: dropTarget.location
 		}}));
 	} else {
 		// If we are not on top of a valid target, put the card back.
-		playSound(play, 200);
+		playSound(play, 100);
 		evt.target.evented = true;
 		evt.target.animate({shadow: '', left: evt.transform.original.left, top: evt.transform.original.top}, {
 			duration: 200,
@@ -216,7 +216,9 @@ function locationToGridIndex (location) {
 
 // Given a hand card index and a location, move the given card, also revealing it, if a cardImageId is passed (always, for spectators or opponent's cards)
 function moveCard (moveDetail) {
-	let card = opponentCards.splice(moveDetail.cardIndexInHand, 1, undefined)[0];
+	let card = (moveDetail.mine) ?
+		playerCards.splice(moveDetail.cardIndexInHand, 1, undefined)[0] :
+		opponentCards.splice(moveDetail.cardIndexInHand, 1, undefined)[0];
 
 	// TODO: FIGURE: Consider if it is just better to use an object, so that there is no lookup needed, instead of an array
 	let gridIndex = locationToGridIndex(moveDetail.location);
@@ -230,7 +232,7 @@ function moveCard (moveDetail) {
 			duration: 500,
 			easing: fabric.util.ease.easeInOutExpo,
 			onChange: canvas.renderAll.bind(canvas),
-			onComplete: fetchCardFace.bind(card)
+			onComplete: (moveDetail.mine) ? undefined: fetchCardFace.bind(card)
 		});
 	}
 }
@@ -336,9 +338,10 @@ function renderHand (cards, isOpponent) {
 // Cards and board are not guaranteed to load in ascending order, so force it
 function restackCanvasElements () {
 	if (playerCards.length !== 5 && opponentCards !== 5) {
+		// console.log('WAIT: restackCanvasElements', playerCards.length, opponentCards.length);
 		setTimeout(() => {
 			restackCanvasElements();
-		}, 200);
+		}, 500);
 	} else {
 		// console.log(`restackCanvasElements`);
 		for (let i = playerCards.length -1; i >= 0; i--) {
@@ -557,30 +560,115 @@ function renderPlayerScore (score, isOpponent) {
 		textAlign: 'center',
 	});
 	text = text.scaleToWidth(cardWidth / 3);
+
 	if (isOpponent) {
-		if (opponentScoreText) {
-			opponentScoreText.text = score;
+		if (opponentRoundScoreText) {
+			opponentRoundScoreText.text = score;
 		} else {
-			opponentScoreText = text;
-			opponentScoreText.stroke = opponentColor;
+			opponentRoundScoreText = text;
+			opponentRoundScoreText.stroke = opponentColor;
 			canvas.add(text);
 		}
 	} else {
-		if (playerScoreText) {
-			playerScoreText.text = score;
+		if (playerRoundScoreText) {
+			playerRoundScoreText.text = score;
 		} else {
-			playerScoreText = text;
-			playerScoreText.stroke = playerColor;
+			playerRoundScoreText = text;
+			playerRoundScoreText.stroke = playerColor;
 			canvas.add(text);
 		}
 	}
 	canvas.renderAll();
 }
 
-function renderScoreStoplight (matchDetail = {scoreboard: {}}) {
-	playerScore = matchDetail.scoreboard[playerColor] || playerScore;
-	opponentScore = matchDetail.scoreboard[opponentColor] || opponentScore;
+function renderRematchBlock () {
+	let text = new fabric.Text('Rematch?', {
+		evented: false,
+		fill: '#333',
+		fontFamily: 'Comic Sans MS, cursive, sans-serif',
+		left: cardWidth / 2,
+		originX: 'center',
+		originY: 'center',
+		textAlign: 'center',
+	});
 
+	text = text.scaleToWidth(cardWidth * 2.5);
+
+	let yesText = new fabric.Text('Yes', {
+		fill: '#333',
+		fontFamily: 'Comic Sans MS, cursive, sans-serif',
+		originX: 'center',
+		originY: 'center',
+	});
+
+	yesText = yesText.scaleToHeight(cardWidth / 2);
+
+	let yesButton = new fabric.Rect({
+		fill: 'green',
+		height: cardWidth / 2,
+		originX: 'center',
+		originY: 'center',
+		stroke: '#000',
+		strokeWidth: 1,
+		width: cardWidth,
+	});
+
+	yesButtonBlock = new fabric.Group([ yesButton, yesText ], {
+		left: - cardWidth,
+		top: text.getScaledHeight() / 2,
+		value: 'yes'
+	});
+
+	let noText = new fabric.Text('No', {
+		fill: '#333',
+		fontFamily: 'Comic Sans MS, cursive, sans-serif',
+		hasControls: false,
+		originX: 'center',
+		originY: 'center',
+	});
+
+	noText = noText.scaleToHeight(cardWidth / 2);
+
+	let noButton = new fabric.Rect({
+		fill: 'red',
+		height: cardWidth / 2,
+		originX: 'center',
+		originY: 'center',
+		stroke: '#000',
+		strokeWidth: 1,
+		width: cardWidth,
+	});
+
+	noButtonBlock = new fabric.Group([ noButton, noText ], {
+		left: cardWidth,
+		top: text.getScaledHeight() / 2,
+		value: 'no'
+	});
+
+	rematchBlock = new fabric.Group([ text, noButtonBlock, yesButtonBlock ], {
+		borderColor: 'transparent',
+		hasControls: false,
+		hoverCursor: 'default',
+		left: canvas.width / 2,
+		lockMovementX: true,
+		lockMovementY: true,
+		originX: 'center',
+		originY: 'center',
+		subTargetCheck: true,
+		textAlign: 'center',
+		top: canvas.height / 1.85
+	});
+	canvas.add(rematchBlock);
+
+	rematchBlock.on('mousedown', function (evt) {
+		if (evt.subTargets[0] && evt.subTargets[0].value) {
+			document.dispatchEvent(new CustomEvent('event:rematch', { detail: evt.subTargets[0].value }));
+		}
+	});
+	canvas.renderAll();
+}
+
+function renderScoreStoplight () {
 	let circle1 = new fabric.Circle({
 		fill: false,
 		left: 0,
@@ -615,17 +703,24 @@ function renderScoreStoplight (matchDetail = {scoreboard: {}}) {
 
 	canvas.add(stoplight);
 
-	if (playerScore > 0) {
+	// Empty round indicator circles on round start/restart
+	if (playerRoundScore === 0 && opponentRoundScore === 0) {
+		stoplight.item(0).set({fill: false});
+		stoplight.item(1).set({fill: false});
+		stoplight.item(2).set({fill: false});
+	}
+	// or fill in round indicator circles
+	if (playerRoundScore > 0) {
 		stoplight.item(0).set({fill: playerColor});
 
-		if (playerScore > 1) {
+		if (playerRoundScore > 1) {
 			stoplight.item(1).set({fill: playerColor});
 		}
 	}
-	if (opponentScore > 0) {
+	if (opponentRoundScore > 0) {
 		stoplight.item(2).set({fill: opponentColor});
 
-		if (opponentScore > 1) {
+		if (opponentRoundScore > 1) {
 			stoplight.item(1).set({fill: opponentColor});
 		}
 	}
@@ -645,9 +740,9 @@ function isRenderComplete () {
 
 function startRound (cards, opponentCards) {
 	playerCards = [];
-	playerScoreText = null;
+	playerRoundScoreText = null;
 	opponentCards = [];
-	opponentScoreText = null;
+	opponentRoundScoreText = null;
 	canvas.clear();
 	renderGameGrid();
 	renderHand(cards);

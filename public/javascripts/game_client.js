@@ -1,68 +1,74 @@
 // This file manages the games client's logic. It's here that Socket.io connections are handled and functions from canvas.js are used to manage the game's visual appearance.
 
+let ANIMATION_TIME = 750;
 let socket = io();
 let canPlayCard = false;
-let debugMode = false;
+let debugMode = true;
 let log;
 let playerColor = "";
-let playerPoints = 5;
-let playerScore = 0;
+let playerRoundStrength = 5;
+let playerRoundScore = 0;
+let playerRunningScore;
 let opponentColor = "";
-let opponentPoints = 5;
-let opponentScore = 0;
+let opponentRoundStrength = 5;
+let opponentRoundScore = 0;
+let opponentRunningScore;
 let cardEventQueue = [];
 let matchWinner, matchEndReason, readyToEnd, timerInterval;
 
 //////////  Socket Events  \\\\\\\\\\
-socket.on("enter match", function(matchDetail) {
+socket.on("enter match", function (matchDetail) {
 	enterMatch(matchDetail);
 });
 
-socket.on("draw hand", function(cards) {
-	debugMode && console.log('io: draw hand --> canvas.startRound()');
-
-	// TODO: Add a way of acknowledging the previous round before starting the next one
-	setTimeout(() => {
-		startRound(cards);
-	}, 1000);
+socket.on("draw hand", function (cards) {
+	// If we are in replay mode, keep from starting a new round until the current round is complete
+	if (cardEventQueue.length === 0) {
+		// TODO: Add a way of acknowledging the previous round before starting the next one
+		setTimeout(() => {
+			startRound(cards);
+		}, ANIMATION_TIME);
+	} else {
+		cardEventQueue.push({type: 'draw', cards: cards});
+	}
 });
 
-// Object format: {cardIndexInHand: 0, location: '1,1', color: 'red', cardImageId: '104'}
-socket.on("card played", function(moveDetail) {
+// moveDetail format: {cardIndexInHand: 0, location: '1,1', color: 'red', cardImageId: '104'}
+socket.on("card played", function (moveDetail) {
+	moveDetail.type = 'move';
 	cardEventQueue.push(moveDetail);
 	if (cardEventQueue.length === 1) {
-		cardPlayed();
+		cardEvent();
 	}
 });
 
-socket.on("card flipped", function(flipDetail) {
+// flipDetail format: {location: '1,1'}
+socket.on("card flipped", function (flipDetail) {
+	flipDetail.type = 'flip';
 	cardEventQueue.push(flipDetail);
 	if (cardEventQueue.length === 1) {
-		cardFlipped();
+		cardEvent();
 	}
 });
 
-socket.on("update score", function(matchDetail) {
-	renderScoreStoplight(matchDetail);
+socket.on("update score", function (matchDetail) {
+	cardEventQueue.push({type: 'stoplight', matchDetail: matchDetail});
 });
 
-socket.on("update strength", function(matchDetail) {
-	updatePlayerStrengthValues(matchDetail);
-});
-
-socket.on("enable cards", function(activePlayer) {
+socket.on("enable cards", function (activePlayer) {
 	updateActivePlayer(activePlayer);
 });
 
-socket.on("fight result", function(result) {
+socket.on("fight result", function (result) {
 	displayResult(result);
 });
 
-socket.on("end match", function(matchDetail) {
-	endMatch(matchDetail);
+socket.on("end match", function (matchDetail) {
+	cardEventQueue.push({type: 'end', matchDetail: matchDetail});
+	cardEvent(); // MAYBE?
 });
 
-socket.on("no rematch", function() {
+socket.on("no rematch", function () {
 	if (labels["waiting"].visible || labels["rematch"].visible) {
 		labels["waiting"].visible = false;
 		labels["rematch"].disabled = true;
@@ -71,10 +77,9 @@ socket.on("no rematch", function() {
 	}
 });
 
-// Catch the canvas play-card event, and send it on to Socket.io
+// Catch the canvas play-card and rematch events, and send them on to Socket.io
 document.addEventListener('event:play-card', playCard);
-
-// TODO: Catch the canvas start match/rematch events, and send on to Socket.io
+document.addEventListener('event:rematch', rematch);
 
 //////////  Functions  \\\\\\\\\\
 function enterQueue () {
@@ -86,14 +91,15 @@ function enterQueue () {
 }
 
 function enterMatch (matchDetail) {
-	debugMode && console.log(`enterMatch`, matchDetail);
+	// debugMode && console.log(`enterMatch`, matchDetail);
 
 	playerColor = matchDetail.playerColor;
 	opponentColor = matchDetail.opponentColor;
-	playerPoints = matchDetail.roundStrength[playerColor];
-	opponentPoints = matchDetail.roundStrength[opponentColor];
-	// TODO: Add best of three scoreboard, tied to match data
+	playerRoundStrength = matchDetail.roundStrength[playerColor];
+	opponentRoundStrength = matchDetail.roundStrength[opponentColor];
 	cardEventQueue = [];
+
+	updateScores(matchDetail);
 
 	// labels["result"].visible = false;
 	// labels["main menu"].visible = false;
@@ -108,44 +114,61 @@ function enterMatch (matchDetail) {
 	// displayCardSlots = true;
 }
 
+function rematch (evt) {
+	debugMode && console.log("event:rematch", evt.detail);
+
+	if (evt.detail === 'yes') {
+		// TODO: Add Analytics conversion event
+		socket.emit("request rematch");
+	} else {
+		socket.emit("leave match");
+	}
+}
+
 function playCard (evt) {
 	debugMode && console.log("event:play-card", evt.detail);
 
 	socket.emit("play card", evt.detail.cardIndex, evt.detail.location);
 }
 
-function cardPlayed () {
+// TODO: FIGURE: A single card event queue works, for now, assuming that events do not come out of order.
+function cardEvent () {
 	if (isRenderComplete() && cardEventQueue.length) {
-		moveDetail = cardEventQueue.shift();
-		debugMode && console.log(`cardPlayed --> canvas.moveCard(${JSON.stringify(moveDetail)})`);
-		if (moveDetail) {
-			moveCard(moveDetail);
+		cardEventDetail = cardEventQueue.shift();
+		switch (cardEventDetail.type) {
+			case 'move':
+				debugMode && console.log(`play card:${cardEventDetail.location}, ${cardEventDetail.cardImageId} ${(cardEventDetail.mine) ? '(mine)' : ''}`);
+				moveCard(cardEventDetail);
+				break;
+			case 'flip':
+				// TODO: If there are multiple flips cached, grab them all to play simultaneously
+				debugMode && console.log(`flip card: ${cardEventDetail.location}`);
+				flipCard(cardEventDetail.location);
+				updatePlayerStrengthValues(cardEventDetail.matchDetail);
+				break;
+			case 'draw':
+				debugMode && console.log(`io: draw hand --> canvas.startRound()`);
+				// TODO: Add a way of acknowledging the previous round before starting the next one
+				startRound(cardEventDetail.cards);
+				break;
+			case 'stoplight':
+				debugMode && console.log(`canvas.renderScoreStoplight() ${JSON.stringify(cardEventDetail.matchDetail.scoreboard)}`);
+				updateScores(cardEventDetail.matchDetail);
+				break;
+			case 'end':
+				debugMode && console.log(`endMatch`);
+				endMatch(cardEventDetail.matchDetail);
+				break;
+			default:
+				break;
 		}
 		setTimeout(() => {
-			cardPlayed();
-		}, 600);
+			cardEvent();
+		}, ANIMATION_TIME);
 	} else {
 		setTimeout(() => {
-			cardPlayed();
-		}, 600);
-	}
-}
-
-// TODO: Look at the impact of having all card events in a single queue (we might be popping off an event meant for the other function)
-function cardFlipped () {
-	if (isRenderComplete() && cardEventQueue.length) {
-		flipDetail = cardEventQueue.shift();
-		debugMode && console.log(`cardFlipped --> canvas.flipCard(${JSON.stringify(flipDetail)})`);
-		if (flipDetail) {
-			flipCard(flipDetail.location);
-		}
-		setTimeout(() => {
-			cardFlipped();
-		}, 600);
-	} else {
-		setTimeout(() => {
-			cardFlipped();
-		}, 600);
+			cardEvent();
+		}, ANIMATION_TIME);
 	}
 }
 
@@ -155,45 +178,31 @@ function updateActivePlayer (activePlayer) {
 	} else {
 		setTimeout(() => {
 			enableCards(activePlayer);
-		}, 600);
+		}, ANIMATION_TIME);
 	}
 }
 
 // Any time a card is flipped, the round score values have changed, so update the numbers
 function updatePlayerStrengthValues (matchDetail) {
+	debugMode && console.log(`updatePlayerStrengthValues: ${JSON.stringify(matchDetail.roundStrength)}`);
 	renderPlayerScore(matchDetail.roundStrength[playerColor]);
 	renderPlayerScore(matchDetail.roundStrength[opponentColor], true);
 }
 
-function displayResult(result) {
-	debugMode && console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	var player = undefined;
-	var opponent = undefined;
-	if (result.winner.socketId === socket.id) {
-		player = result.winner;
-		opponent = result.loser;
-	} else {
-		player = result.loser;
-		opponent = result.winner;
+function updateScores (matchDetail) {
+	// debugMode && console.log(`updateScores: ${JSON.stringify(matchDetail)}`);
+	playerRoundScore = matchDetail.scoreboard[playerColor] || 0;
+	opponentRoundScore = matchDetail.scoreboard[opponentColor] || 0;
+	if (matchDetail.runningScore && (matchDetail.runningScore[playerColor] || matchDetail.runningScore[opponentColor])) {
+		playerRunningScore = matchDetail.runningScore[playerColor] || 0;
+		opponentRunningScore = matchDetail.runningScore[opponentColor] || 0;
 	}
-	playerPoints = player.points;
-	opponentPoints = opponent.points;
-	setTimeout(function() {
-		if (readyToEnd) {
-			endMatch();
-		} else {
-			canPlayCard = true;
-			timerInterval = setInterval(updateTimer, 1000);
-			canPlayCard = true;
-			socket.emit("request cards update");
-		}
-	}, (2 * 1000));
+	renderScoreStoplight();
 }
 
-function endMatch(matchDetail) {
-	renderScoreStoplight(matchDetail);
+function endMatch (matchDetail) {
+	renderScoreStoplight(); // PROBABLY DON'T NEED THIS
 
-	debugMode && console.log(`endMatch`);
 	log = matchDetail.log;
 	console.log(log);
 
@@ -213,7 +222,8 @@ function endMatch(matchDetail) {
 		} else {
 			// alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		}
-	}, 700);
+		renderRematchBlock();
+	}, ANIMATION_TIME);
 
 	// canPlayCard = false;
 	// readyToEnd = false;
@@ -242,8 +252,8 @@ function endMatch(matchDetail) {
 
 function exitMatch () {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	playerPoints = [];
-	opponentPoints = [];
+	playerRoundStrength = 0;
+	opponentRoundStrength = 5;
 	socket.emit("leave match");
 	labels["result"].visible = false;
 	labels["main menu"].visible = false;

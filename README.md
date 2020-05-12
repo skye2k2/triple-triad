@@ -26,13 +26,15 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Board completely drawn by repeating and rotating a single corner art image
 - Only active player can play cards
 - Server-side validation of cards & card placement, to keep things from being too easy for hackers
-- Shuffle or Boogie music (remix by: SOURCE), with subtle playing indication (notes bounce in time to the music)
+- Sound effects for playing and flipping cards, and winning and losing the match
+- Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce in time to the music)
+- Immediate rematch option given to both players
 
 #### TODO List:
 
+- HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
 - Perfectly centered game board and title positioning
 - Add board background art
-- Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
 - Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
   - Similarly, after the second player has joined, anyone else will just be a spectator (tricky bit)
   - Allow spectators to connect to matches in progress (replay from game log)
@@ -40,9 +42,10 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Allow users to choose names (maybe from a selection of FF VIII characters, to avoid vulgarity)
 - Add 30-second countdown timer per turn + autoplay functionality (initial logic for AI bots, just play the first card found that can capture an opponent's card, or the most defensive card available)
 - Add keyboard/controller support
+- Add effects for clicking rematch buttons, with indicator of if opponent wants a rematch
 - Add hover effect outline for target location when dragging card
 - Add all extended game rule options (Open, Chain, Plus)
-- Stress tester script, to see how many active games can run at a time, and limit games to that upper bound, to ensure a minimum performance level
+- Stress tester script, to see how many active games can run at a time, and limit games to that upper bound, to ensure a minimum performance level (https://stackoverflow.com/a/16426868/5334305)
 - See about adding to https://www.crazygames.com/c/io
 - Create AI bot node clients, and allow player to choose to wait for a human or have a bot opponent
 - Allow page refresh without quitting match

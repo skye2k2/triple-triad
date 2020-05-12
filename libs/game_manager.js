@@ -137,11 +137,17 @@ function leaveQueue (socket) {
 
 // Match Management
 
-function createId () {
+function createId (idLength = 4) {
 	var id = "";
-	var charset = "ABCDEFGHIJKLMNOPQRSTUCWXYZabcdefghijklmnopqrtsuvwxyz1234567890";
-	for (var i = 0; i < 16; i++) {
+	var charset = "ACDEFGHJKLMNPRTUWXY34679"; // Only use easy-to-read options
+	for (var i = 0; i < idLength; i++) {
 		id += charset.charAt(Math.floor(Math.random() * charset.length));
+	}
+	// Check against the unlikely event that the generated id already exists, and create an alternate ID
+	for (var i = 0; i < matches.length; i++) {
+		if (matches[i].id === id) {
+			return createId(idLength);
+		}
 	}
 	return id;
 }
@@ -150,25 +156,21 @@ function createMatch (participants) {
 	let id = createId();
 	let startingPlayer = (Math.floor(Math.random() * 2) === 0)? 0 : 1;
 	let match = {
-		board: JSON.parse(JSON.stringify(emptyBoard)),
-		roundNumber: 0,
-		roundStrength: {
-			red: 5,
-			blue: 5
-		},
-		scoreboard: {
-			red: 0,
-			blue: 0
-		},
-		log: [],
+		matchCount: 0,
 		matchId: id,
 		players: [],
 		rules: "BASIC",
+		runningScore: {
+			red: 0,
+			blue: 0
+		},
 		spectators: [], // TODO: Implement
-		isOver: false,
 		timerActive: false,
 		timer: timerDuration
 	};
+
+	setMatchDefaults(match);
+
 	for (var i = 0; i < participants.length; i++) {
 		var playerObject = {
 			activePlayer: (i === startingPlayer),
@@ -179,7 +181,7 @@ function createMatch (participants) {
 		};
 		match.players.push(playerObject);
 		// TODO: CLEANUP: Just have a single state object that contains all of the round and match information to send to the clients, or a function that assembles the data on-the-fly, to keep duplication down
-		participants[i].socket.emit("enter match", Object.assign({}, { roundStrength: match.roundStrength, scoreboard: match.scoreboard, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red' }));
+		participants[i].socket.emit("enter match", Object.assign({}, { roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red' }));
 		participants[i].socket.join(id);
 	}
 
@@ -188,18 +190,14 @@ function createMatch (participants) {
 	startNewRound(match);
 	match.timerActive = true;
 
-	// HARD-CODED ANIMATION TESTING
-	// for (var i = 0; i < 5; i++) {
-	// 	playCard(match.players[0].socket, 0, `1,1`);
-	// 	playCard(match.players[1].socket, 0, '1,2');
-	// 	playCard(match.players[0].socket, 1, `1,3`);
-	// 	playCard(match.players[1].socket, 1, '2,1');
-	// 	playCard(match.players[0].socket, 2, `2,2`);
-	// 	playCard(match.players[1].socket, 2, '2,3');
-	// 	playCard(match.players[0].socket, 3, `3,1`);
-	// 	playCard(match.players[1].socket, 3, '3,2');
-	// 	playCard(match.players[0].socket, 4, `3,3`);
-	// }
+	// HARD-CODED REMATCH TESTING
+	// match.matchCount = 3;
+	// match.runningScore = {
+	// 	red: 2,
+	// 	blue: 1
+	// };
+	// rematchRequested(match.players[0].socket);
+	// rematchRequested(match.players[1].socket);
 
 	// HARD-CODED MATCH EVENT TESTING
 	// setTimeout(() => {
@@ -211,7 +209,7 @@ function createMatch (participants) {
 
 function endMatch (match) {
 	console.log('END MATCH');
-	io.to(match.matchId).emit("end match", {scoreboard: match.scoreboard, log: match.log});
+	io.to(match.matchId).emit("end match", {scoreboard: match.scoreboard, log: match.log, runningScore: match.runningScore});
 	match.isOver = true;
 
 	// console.log(match);
@@ -260,13 +258,38 @@ function playerDisconnectedFromMatch (socket) {
 	}
 }
 
+// Reset the bits that need to be for each match
+function setMatchDefaults (match, rematch) {
+	match.matchCount++;
+
+	if (rematch) {
+		delete match.rematch;
+	}
+
+	const defaults = {
+		isOver: false,
+		log: [],
+		roundNumber: 0,
+		roundStrength: {
+			red: 5,
+			blue: 5
+		},
+		scoreboard: {
+			red: 0,
+			blue: 0
+		},
+	}
+
+Object.assign(match, defaults)
+}
+
 function rematchRequested (socket) {
 	var match = findMatchBySocketId(socket.id);
 	if (match) {
-		var players = match.players;
-		if (match.rematch !== undefined && match.rematch !== socket.id) {
-			removeMatch(match);
-			createMatch(players);
+		if (match.rematch && match.rematch !== socket.id) {
+			setMatchDefaults(match, true);
+			io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard, runningScore: match.runningScore});
+			startNewRound(match);
 		} else {
 			match.rematch = socket.id;
 		}
@@ -278,6 +301,11 @@ function removeMatch (match) {
 	if (index > -1) {
 		matches.splice(index, 1);
 	}
+	updateMatchStatistics();
+}
+
+function updateMatchStatistics () {
+	// active games, open lobbies, total number of games, ever, and push to anyone in lobby
 }
 
 // Round Scoring & Management
@@ -286,11 +314,11 @@ function removeMatch (match) {
  * @description - After a card is played, determine its effect on the board, and if the board is now full, determine the round winner.
  * @returns {undefined} - Modifies match data directly.
  */
-function calculateResult (match, coords) {
-	attack(match, coords, 'north');
-	attack(match, coords, 'east');
-	attack(match, coords, 'south');
-	attack(match, coords, 'west');
+function calculateResult (match, coords, replay) {
+	attack(match, coords, 'north', replay);
+	attack(match, coords, 'east', replay);
+	attack(match, coords, 'south', replay);
+	attack(match, coords, 'west', replay);
 
 	let gameSpaces = 0;
 	let filledSpaces = 0;
@@ -305,7 +333,7 @@ function calculateResult (match, coords) {
  * @description - From the attacking space, determine if any cards need to be flipped.
  * @returns {undefined} - Modifies match data directly.
  */
-function attack (match, coords, attackingDirection) {
+function attack (match, coords, attackingDirection, replay) {
 	let board = match.board;
 	let attackingLocation = board[coords[0]][coords[1]];
 	let defendingLocation;
@@ -339,15 +367,14 @@ function attack (match, coords, attackingDirection) {
 
 	// Determine if defending card belongs to opponent
 	if (defendingLocation && defendingLocation.color !== attackingLocation.color) {
-		// Only the card played can flip, if its power is greater than the defending card(s).
+		// Only the card played can flip, if its power is greater than the defending card.
 		if (match.rules === "BASIC") {
 			if (defendingLocation.card && attackingLocation.card[attackingDirection] > defendingLocation.card[defendingDirection]) {
 				match.roundStrength[attackingLocation.color]++;
 				match.roundStrength[defendingLocation.color]--;
 				defendingLocation.color = attackingLocation.color;
 				log(` - ${attackingLocation.color} capture: ${attackingDirection}: ${defendingLocation.card.name}`, match);
-				io.to(match.matchId).emit("card flipped", {location: defendingLocationString});
-				io.to(match.matchId).emit("update strength", {roundStrength: match.roundStrength});
+				io.to(match.matchId).emit("card flipped", {location: defendingLocationString, matchDetail: { roundStrength: match.roundStrength}});
 			}
 		// TODO: equal values can flip on the initial placement, and then flipped cards can "combo", flipping additional cards if they are more powerful.
 		} else if (match.rules === "SAME") {
@@ -380,7 +407,7 @@ function processRound (match) {
 	let redTotalScore = match.scoreboard.red;
 	let blueTotalScore = match.scoreboard.blue;
 
-	io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard});
+	io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard, runningScore: match.runningScore});
 
 	// var matchResults = {
 	// 	tied: tied,
@@ -397,10 +424,12 @@ function processRound (match) {
 
 	// Check if game is over, otherwise start the next round
 	if (redTotalScore === 2) {
-		log(`red: WIN GAME (${redTotalScore} - ${blueTotalScore})`);
+		match.runningScore.red++
+		log(`red: WIN MATCH (${redTotalScore} - ${blueTotalScore})`);
 		endMatch(match);
 	} else if (blueTotalScore === 2) {
-		log(`blue: WIN GAME (${blueTotalScore} - ${redTotalScore})`);
+		match.runningScore.blue++
+		log(`blue: WIN MATCH (${blueTotalScore} - ${redTotalScore})`);
 		endMatch(match);
 	} else {
 		log(`Total Score: red: ${redTotalScore} blue: ${blueTotalScore}`);
@@ -414,7 +443,7 @@ function processRound (match) {
  */
 function startNewRound (match, tiebreakerRound) {
 	if (tiebreakerRound) {
-		log(`Tiebreaker Round`, match);
+		log(`Round ${match.roundNumber} Tiebreaker`, match);
 	} else {
 		match.roundNumber++;
 		log(`Begin Round ${match.roundNumber}`, match);
@@ -439,7 +468,26 @@ function startNewRound (match, tiebreakerRound) {
 		dealHand(player);
 		player.socket.emit("draw hand", player.cards);
 	}
+
 	toggleActivePlayer(match);
+
+	// HARD-CODED MATCH TESTING
+	// BUG: AFTER DOING THIS, WHEN A NEW ROUND STARTS, WE NO LONGER GET OPPONENT CARD PLAY EVENTS...
+	// if (match.roundNumber < 4) {
+	// 	setTimeout(() => {
+	// 		let activePlayer = (match.players[0].activePlayer) ? 0 : 1;
+	// 		let otherPlayer = (activePlayer === 0) ? 1 : 0;
+	// 		playCard(match.players[activePlayer].socket, 0, '1,1', true);
+	// 		playCard(match.players[otherPlayer].socket, 0, '1,2', true);
+	// 		playCard(match.players[activePlayer].socket, 1, '1,3', true);
+	// 		playCard(match.players[otherPlayer].socket, 1, '2,1', true);
+	// 		playCard(match.players[activePlayer].socket, 2, '2,2', true);
+	// 		playCard(match.players[otherPlayer].socket, 2, '2,3', true);
+	// 		playCard(match.players[activePlayer].socket, 3, '3,1', true);
+	// 		playCard(match.players[otherPlayer].socket, 3, '3,2', true);
+	// 		playCard(match.players[activePlayer].socket, 4, '3,3', true);
+	// 	}, 500);
+	// }
 }
 
 /**
@@ -538,7 +586,7 @@ function drawCard (deck) {
  * @description - Play the card at the specified hand index to the specified location.
  * @returns {undefined} - Modifies match data directly and calls out, if needed.
  */
-function playCard (socket, cardIndex, location) {
+function playCard (socket, cardIndex, location, replay) {
 	// console.log('playCard attempt: ', socket.id, `\n cardIndex: ${cardIndex}\n location: ${location}`);
 	let match = findMatchBySocketId(socket.id);
 	if (match) {
@@ -560,6 +608,9 @@ function playCard (socket, cardIndex, location) {
 
 					log(`${player.color}: ${location}: ${card.name}`, match);
 					opponent.socket.emit("card played", {cardIndexInHand: cardIndex, location: location, color: opponent.color, cardImageId: card.id});
+					if (replay) {
+						player.socket.emit("card played", {cardIndexInHand: cardIndex, location: location, color: player.color, cardImageId: card.id, mine: true});
+					}
 					player.cards[cardIndex] = undefined;
 					// Only toggle the active player if a player still has cards. The active player switches at the start of each round
 					for (let i = 0; i < player.cards.length; i++) {
@@ -569,15 +620,13 @@ function playCard (socket, cardIndex, location) {
 						}
 					}
 
-					// console.log(match.board);
-
-					calculateResult(match, coords);
+					calculateResult(match, coords, replay);
 				}
 			}
 		} else {
 			// The only way this should happen is if a player hacked their CSS to re-enable events on the other player's turn
-			console.warn("INVALID MOVE ATTEMPTED");
-			opponent.socket.emit("undo play", {cardIndexInHand: cardIndex, location: location}); // TODO: IMPLEMENT THIS
+			console.warn(`INVALID MOVE ATTEMPTED (location: ${boardLocation.card}, activePlayer: ${player.activePlayer})`);
+			player.socket.emit("undo play", {cardIndexInHand: cardIndex, location: location}); // TODO: IMPLEMENT THIS
 		}
 	}
 }
