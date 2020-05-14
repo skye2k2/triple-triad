@@ -56,11 +56,21 @@ socket.on("update score", function (matchDetail) {
 });
 
 socket.on("enable cards", function (activePlayer) {
-	updateActivePlayer(activePlayer);
+	if (cardEventQueue.length === 0) {
+		setTimeout(() => {
+			updateActivePlayer(activePlayer);
+		}, ANIMATION_TIME);
+	} else {
+		cardEventQueue.push({type: 'enable', active: activePlayer});
+	}
 });
 
 socket.on("fight result", function (result) {
 	displayResult(result);
+});
+
+socket.on("replay match", function (matchDetail) {
+	// TODO: Implement. Loop through match log, and queue up events
 });
 
 socket.on("end match", function (matchDetail) {
@@ -155,6 +165,10 @@ function cardEvent () {
 			case 'stoplight':
 				debugMode && console.log(`canvas.renderScoreStoplight() ${JSON.stringify(cardEventDetail.matchDetail.scoreboard)}`);
 				updateScores(cardEventDetail.matchDetail);
+				break;
+			case 'enable':
+				debugMode && console.log(`enable hand: ${cardEventDetail.active}`);
+				updateActivePlayer(cardEventDetail.active);
 				break;
 			case 'end':
 				debugMode && console.log(`endMatch`);
@@ -266,14 +280,6 @@ function exitMatch () {
 	resetDots(labels["waiting"]);
 	labels["play"].visible = true;
 	labels["play"].clickable = true;
-}
-
-function requestRematch () {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	socket.emit("request rematch");
-	labels["rematch"].visible = false;
-	labels["rematch"].clickable = false;
-	labels["waiting"].visible = true;
 }
 
 function animateLabels () {
