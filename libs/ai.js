@@ -16,8 +16,8 @@ let debugMode = true;
 
 let ai = {
 	// Prefix and log messages, as necessary
-	log: function (logString, match) {
-		logString = ` - AI: ${logString}`;
+	log: function (logString, match, myIndex) {
+		logString = ` - ${match.players[myIndex].color} AI: ${logString}`;
 
 		// if (match) {
 		// 	match.log.push(logString);
@@ -43,7 +43,7 @@ let ai = {
 		let worstCardIndex = this.determineMinMaxCard(match, myIndex, 'worst');
 
 		if (this.isBoardEmpty(match)) {
-			this.log(`board is empty--playing worst card in the center`);
+			this.log(`board is empty--playing worst card in the center`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
 		}
 
@@ -57,36 +57,36 @@ let ai = {
 		// console.log(boardAnalysis);
 
 		if (boardAnalysis.highValueAttackSpaces.length) {
-			this.log(`playing best card in a high-value attackable space`);
+			this.log(`playing best card in a high-value attackable space`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.attackableSpaces));
 		}
 
 		if (boardAnalysis.attackableSpaces.length) {
 			// Try each card in hand, to see which result in a successful attack
 			// Then use the lowest-ranked option (future: that is reasonably safe)
-			for (let i = 0; i < boardAnalysis.attackableSpaces.length; i++) {
-				for (let j = 0; j < match.players[myIndex].cards.length; j++) {
-					// if (match.players[myIndex].cards[j] !== undefined)
-					// let captures = playCard(match.players[myIndex].socket, match.players[myIndex].cards[j], boardAnalysis.attackableSpaces[i], 'preview');
-					// if (captures.length > 1) {
-					// 	potentialMoves.highValue.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
-					// } else if (captures.length > 0) {
-					// 	potentialMoves.successful.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
-					// } else {
-					// 	potentialMoves.unsuccessful.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
-					// }
-				}
-			}
-			this.log(`playing worst card in a random attackable space`);
+			// for (let i = 0; i < boardAnalysis.attackableSpaces.length; i++) {
+			// 	for (let j = 0; j < match.players[myIndex].cards.length; j++) {
+			// 		if (match.players[myIndex].cards[j] !== undefined)
+			// 		let captures = playCard(match.players[myIndex].socket, match.players[myIndex].cards[j], boardAnalysis.attackableSpaces[i], 'preview');
+			// 		if (captures.length > 1) {
+			// 			potentialMoves.highValue.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
+			// 		} else if (captures.length > 0) {
+			// 			potentialMoves.successful.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
+			// 		} else {
+			// 			potentialMoves.unsuccessful.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
+			// 		}
+			// 	}
+			// }
+			this.log(`playing worst card in a random attackable space`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.attackableSpaces));
 		}
 
 		// If there are no appealing options, just play my lowest card in an available space
 		if (boardAnalysis.openSpaces.length) {
-			this.log(`no good options--playing worst card in a random open space`);
+			this.log(`no good options--playing worst card in a random open space`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
 		} else {
-			this.log(`ERROR: no open spaces`);
+			this.log(`ERROR: no open spaces`, match, myIndex);
 		}
 	},
 
@@ -174,21 +174,31 @@ let ai = {
 
 	// Return the card in my hand that has the highest/lowest index
 	determineMinMaxCard: function (match, myIndex, type) {
-		let myWorstCardIndex = match.players[myIndex].cards.reduce((accumulator, currentCard, currentIndex) => {
-			let accumulatorCard = match.players[myIndex].cards[accumulator];
+		let cards = match.players[myIndex].cards;
+		let initialAccumulatorIndex;
+
+		for (let i = 0; i < cards.length; i++) {
+			if (cards[i]) {
+				initialAccumulatorIndex = i;
+				break;
+			}
+		};
+
+		let minMaxCardIndex = cards.reduce((accumulator, currentCard, currentIndex) => {
+			let accumulatorCard = cards[accumulator];
 			if (currentCard && accumulatorCard) {
 				let operation = (type === 'worst') ?
 					eval(parseInt(currentCard.id) < parseInt(accumulatorCard.id)) :
-					eval(parseInt(currentCard.id) < parseInt(accumulatorCard.id));
+					eval(parseInt(currentCard.id) > parseInt(accumulatorCard.id));
 				if (operation) {
 					accumulator = currentIndex;
 				}
 			}
 			return accumulator;
-		}, 0);
+		}, initialAccumulatorIndex);
 
-		// this.log(`worst card determined to be: id=${myWorstCardIndex} (${match.players[myIndex].cards[myWorstCardIndex].name})`);
-		return myWorstCardIndex;
+		// this.log(`worst card determined to be: id=${minMaxCardIndex} (${cards[minMaxCardIndex].name})`, match, myIndex);
+		return minMaxCardIndex;
 	},
 
 	// Return if the board is empty (and we obviously shouldn't run extra logic to determine where to play)
@@ -198,7 +208,7 @@ let ai = {
 			return (space.card)
 		});});
 
-		// this.log(`board is ${(boardIsOccupied) ? 'not ': ''}empty`);
+		// this.log(`board is ${(boardIsOccupied) ? 'not ': ''}empty`, match, myIndex);
 		return !boardIsOccupied;
 	},
 

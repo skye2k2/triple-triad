@@ -637,6 +637,9 @@ function playCard (socket, cardIndex, location, replay) {
 					}
 
 					calculateResult(match, coords, replay);
+				} else {
+					console.log(`INVALID PLAY (cardIndex: ${cardIndex})`);
+					console.log(player.cards);
 				}
 			}
 		} else {

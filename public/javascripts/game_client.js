@@ -79,11 +79,8 @@ socket.on("end match", function (matchDetail) {
 });
 
 socket.on("no rematch", function () {
-	if (labels["waiting"].visible || labels["rematch"].visible) {
+	if (labels["waiting"].visible) {
 		labels["waiting"].visible = false;
-		labels["rematch"].disabled = true;
-		labels["rematch"].clickable = false;
-		labels["rematch"].visible = true;
 	}
 });
 
@@ -114,9 +111,6 @@ function enterMatch (matchDetail) {
 	// labels["result"].visible = false;
 	// labels["main menu"].visible = false;
 	// labels["main menu"].clickable = false;
-	// labels["rematch"].visible = false;
-	// labels["rematch"].clickable = false;
-	// labels["rematch"].disabled = false;
 	// labels["waiting"].visible = false;
 	// resetDots(labels["waiting"]);
 	// labels["searching"].visible = false;
@@ -152,9 +146,14 @@ function cardEvent () {
 				moveCard(cardEventDetail);
 				break;
 			case 'flip':
-				// TODO: If there are multiple flips cached, grab them all to play simultaneously
+				// If there are multiple flips cached from the last play, grab them all to play simultaneously
 				debugMode && console.log(`flip card: ${cardEventDetail.location}`);
 				flipCard(cardEventDetail.location);
+				while (nextEventType('flip')) {
+					nextCardEventDetail = cardEventQueue.shift();
+					debugMode && console.log(`flip card: ${nextCardEventDetail.location}`);
+					flipCard(nextCardEventDetail.location);
+				}
 				updatePlayerStrengthValues(cardEventDetail.matchDetail);
 				break;
 			case 'draw':
@@ -184,6 +183,15 @@ function cardEvent () {
 		setTimeout(() => {
 			cardEvent();
 		}, ANIMATION_TIME);
+	}
+}
+
+function nextEventType (eventType) {
+	let nextEvent = cardEventQueue[0];
+	if (nextEvent && nextEvent.type === eventType) {
+		return true;
+	} else {
+		return false;
 	}
 }
 
@@ -273,9 +281,6 @@ function exitMatch () {
 	labels["result"].visible = false;
 	labels["main menu"].visible = false;
 	labels["main menu"].clickable = false;
-	labels["rematch"].visible = false;
-	labels["rematch"].clickable = false;
-	labels["rematch"].disabled = false;
 	labels["waiting"].visible = false;
 	resetDots(labels["waiting"]);
 	labels["play"].visible = true;
