@@ -3,13 +3,15 @@
 let socketio = require("socket.io");
 
 let cards = require("./cards");
+let AI = require("./ai");
+
+let debugMode = true;
 
 let players = [];
 let queue = [];
 let matches = [];
 let rematchRequests = [];
 
-let debugMode = true;
 let timerDuration = 22;
 
 // | Board |_0_|_1_|_2_|
@@ -176,7 +178,7 @@ function createMatch (participants) {
 			activePlayer: (i === startingPlayer),
 			color: (i === startingPlayer)? 'red' : 'blue',
 			socket: participants[i].socket,
-			deck: generateDeck(),
+			deck: generateDeck(), // BUG: We should be able to do this in startNewRound(), but the events on the client clear the board unnecessarily
 			cards: []
 		};
 		match.players.push(playerObject);
@@ -467,7 +469,12 @@ function startNewRound (match, tiebreakerRound) {
 				tier9: 1,
 				tier10: 1,
 			};
-			player.deck = generateDeck(powerDeckDistribution);
+
+			if (match.roundNumber !== 1) {
+				player.deck = generateDeck(powerDeckDistribution);
+			} else {
+				player.deck = generateDeck();
+			}
 		}
 		dealHand(player);
 		player.socket.emit("draw hand", player.cards);
@@ -475,22 +482,23 @@ function startNewRound (match, tiebreakerRound) {
 
 	toggleActivePlayer(match);
 
-	// HARD-CODED MATCH TESTING
-	// if (match.roundNumber < 4) {
-	// 	setTimeout(() => {
-	// 		let activePlayer = (match.players[0].activePlayer) ? 0 : 1;
-	// 		let otherPlayer = (activePlayer === 0) ? 1 : 0;
-	// 		playCard(match.players[activePlayer].socket, 0, '1,1', true);
-	// 		playCard(match.players[otherPlayer].socket, 0, '1,2', true);
-	// 		playCard(match.players[activePlayer].socket, 1, '1,3', true);
-	// 		playCard(match.players[otherPlayer].socket, 1, '2,1', true);
-	// 		playCard(match.players[activePlayer].socket, 2, '2,2', true);
-	// 		playCard(match.players[otherPlayer].socket, 2, '2,3', true);
-	// 		playCard(match.players[activePlayer].socket, 3, '3,1', true);
-	// 		playCard(match.players[otherPlayer].socket, 3, '3,2', true);
-	// 		playCard(match.players[activePlayer].socket, 4, '3,3', true);
-	// 	}, 500);
-	// }
+	// HARD-CODED TESTING
+	// setTimeout(() => {
+	// 	let activePlayer = (match.players[0].activePlayer) ? 0 : 1;
+	// 	let otherPlayer = (activePlayer === 0) ? 1 : 0;
+	// 	// HARD-CODED AI TESTING
+	// 	if (match.roundNumber < 4) {
+	// 		playAICard(AI.play(match, activePlayer));
+	// 		playAICard(AI.play(match, otherPlayer));
+	// 		playAICard(AI.play(match, activePlayer));
+	// 		playAICard(AI.play(match, otherPlayer));
+	// 		playAICard(AI.play(match, activePlayer));
+	// 		playAICard(AI.play(match, otherPlayer));
+	// 		playAICard(AI.play(match, activePlayer));
+	// 		playAICard(AI.play(match, otherPlayer));
+	// 		playAICard(AI.play(match, activePlayer));
+	// 	}
+	// }, 1000);
 }
 
 /**
@@ -585,6 +593,11 @@ function drawCard (deck) {
 	return deck.shift();
 }
 
+function playAICard(playDetail) {
+	// console.log(`AI PLAY: ${playDetail.cardIndex} ${playDetail.location}`);
+	playCard(playDetail.socket, playDetail.cardIndex, playDetail.location, true);
+}
+
 /**
  * @description - Play the card at the specified hand index to the specified location.
  * @returns {undefined} - Modifies match data directly and calls out, if needed.
@@ -601,7 +614,7 @@ function playCard (socket, cardIndex, location, replay) {
 		let boardLocation = match.board[coords[0]][coords[1]];
 		if (!boardLocation.card && player.activePlayer) {
 			if (cardIndex >= 0 && cardIndex <= 4) {
-				if (player.cards[cardIndex] !== undefined) {
+				if (player.cards[cardIndex] !== null) {
 					let card = player.cards[cardIndex];
 					// TODO: Should be able to do a mod of `player`
 					let opponent = match.players[match.players[0].socket.id !== socket.id ? 0 : 1];
@@ -614,7 +627,7 @@ function playCard (socket, cardIndex, location, replay) {
 					if (replay) {
 						player.socket.emit("card played", {cardIndexInHand: cardIndex, location: location, color: player.color, cardImageId: card.id, mine: true});
 					}
-					player.cards[cardIndex] = undefined;
+					player.cards[cardIndex] = null;
 					// Only toggle the active player if a player still has cards. The active player switches at the start of each round
 					for (let i = 0; i < player.cards.length; i++) {
 						if (player.cards[i]) {
@@ -624,11 +637,14 @@ function playCard (socket, cardIndex, location, replay) {
 					}
 
 					calculateResult(match, coords, replay);
+				} else {
+					console.log(`INVALID PLAY (cardIndex: ${cardIndex})`);
+					console.log(player.cards);
 				}
 			}
 		} else {
-			// The only way this should happen is if a player hacked their CSS to re-enable events on the other player's turn
-			console.warn(`INVALID MOVE ATTEMPTED (location: ${boardLocation.card}, activePlayer: ${player.activePlayer})`);
+			// The only way this should happen is if a player hacked their CSS to re-enable events on the other player's turn, or the AI tried to cheat
+			console.warn(`INVALID MOVE ATTEMPTED (location: ${location} potentially occupied, activePlayer: ${player.activePlayer})`);
 			player.socket.emit("undo play", {cardIndexInHand: cardIndex, location: location}); // TODO: IMPLEMENT THIS
 		}
 	}

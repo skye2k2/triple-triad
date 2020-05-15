@@ -13,7 +13,7 @@ module.exports = {
 		{tier: 1, id:'010', north: 4, east: 2, south: 4, west: 3, name: 'Caterchipillar', element: null},
 		{tier: 1, id:'011', north: 2, east: 1, south: 2, west: 6, name: 'Cockatrice', element: null},
 	],
-	tier2: [ // monsters, < 8, total power < 16
+	tier2: [ // monsters, mostly < 7, total power < 16
 		{tier: 2, id:'012', north: 7, east: 1, south: 3, west: 1, name: 'Grat', element: null},
 		{tier: 2, id:'013', north: 6, east: 2, south: 2, west: 3, name: 'Buel', element: null},
 		{tier: 2, id:'014', north: 5, east: 3, south: 3, west: 4, name: 'Mesmerize', element: null},
@@ -52,7 +52,7 @@ module.exports = {
 		{tier: 4, id:'043', north: 4, east: 5, south: 5, west: 6, name: 'Adamantoise', element: null},
 		{tier: 4, id:'044', north: 7, east: 5, south: 4, west: 3, name: 'Hexadragon', element: null},
 	],
-	tier5: [ // monsters, total power < 24
+	tier5: [ // monsters, < 8 (with one 10), total power < 24
 		{tier: 5, id:'045', north: 6, east: 5, south: 6, west: 5, name: 'Iron Giant', element: null},
 		{tier: 5, id:'046', north: 3, east: 6, south: 5, west: 7, name: 'Behemoth', element: null},
 		{tier: 5, id:'047', north: 7, east: 6, south: 5, west: 3, name: 'Chimera', element: null},
@@ -65,7 +65,7 @@ module.exports = {
 		{tier: 5, id:'054', north: 4, east: 6, south: 7, west: 4, name: 'Tonberry King', element: null},
 		{tier: 5, id:'055', north: 6, east: 6, south: 2, west: 7, name: 'Biggs & Wedge', element: null},
 	],
-	tier6: [ // bosses, total power < 24
+	tier6: [ // bosses, < 9, total power < 24
 		{tier: 6, id:'056', north: 2, east: 8, south: 8, west: 4, name: 'Fujin & Raijin', element: null},
 		{tier: 6, id:'057', north: 7, east: 8, south: 3, west: 4, name: 'Elvoret', element: null},
 		{tier: 6, id:'058', north: 4, east: 8, south: 7, west: 3, name: 'X-ATM092', element: null},
@@ -78,7 +78,7 @@ module.exports = {
 		{tier: 6, id:'065', north: 6, east: 5, south: 8, west: 4, name: 'Shumi Tribe', element: null},
 		{tier: 6, id:'066', north: 7, east: 5, south: 8, west: 1, name: 'Krysta', element: null},
 	],
-	tier7: [ // bosses, total power < 26
+	tier7: [ // bosses, < 9, total power < 26
 		{tier: 7, id:'067', north: 8, east: 4, south: 4, west: 8, name: 'Propagator', element: null},
 		{tier: 7, id:'068', north: 8, east: 8, south: 4, west: 4, name: 'Jumbo Cactuar', element: null},
 		{tier: 7, id:'069', north: 8, east: 5, south: 2, west: 8, name: 'Tri-Point', element: null},
@@ -91,7 +91,7 @@ module.exports = {
 		{tier: 7, id:'076', north: 1, east: 8, south: 7, west: 7, name: 'Catoblepas', element: null},
 		{tier: 7, id:'077', north: 7, east: 7, south: 2, west: 8, name: 'Ultima Weapon', element: null},
 	],
-	tier8: [ // guardian forces, total power < 26
+	tier8: [ // guardian forces, < 10, total power < 26
 		{tier: 8, id:'078', north: 4, east: 4, south: 8, west: 9, name: 'Fat Chocobo', element: null},
 		{tier: 8, id:'079', north: 9, east: 6, south: 7, west: 3, name: 'Angelo', element: null},
 		{tier: 8, id:'080', north: 3, east: 7, south: 9, west: 6, name: 'Gilgamesh', element: null},

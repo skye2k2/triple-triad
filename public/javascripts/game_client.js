@@ -56,11 +56,21 @@ socket.on("update score", function (matchDetail) {
 });
 
 socket.on("enable cards", function (activePlayer) {
-	updateActivePlayer(activePlayer);
+	if (cardEventQueue.length === 0) {
+		setTimeout(() => {
+			updateActivePlayer(activePlayer);
+		}, ANIMATION_TIME);
+	} else {
+		cardEventQueue.push({type: 'enable', active: activePlayer});
+	}
 });
 
 socket.on("fight result", function (result) {
 	displayResult(result);
+});
+
+socket.on("replay match", function (matchDetail) {
+	// TODO: Implement. Loop through match log, and queue up events
 });
 
 socket.on("end match", function (matchDetail) {
@@ -69,11 +79,8 @@ socket.on("end match", function (matchDetail) {
 });
 
 socket.on("no rematch", function () {
-	if (labels["waiting"].visible || labels["rematch"].visible) {
+	if (labels["waiting"].visible) {
 		labels["waiting"].visible = false;
-		labels["rematch"].disabled = true;
-		labels["rematch"].clickable = false;
-		labels["rematch"].visible = true;
 	}
 });
 
@@ -104,9 +111,6 @@ function enterMatch (matchDetail) {
 	// labels["result"].visible = false;
 	// labels["main menu"].visible = false;
 	// labels["main menu"].clickable = false;
-	// labels["rematch"].visible = false;
-	// labels["rematch"].clickable = false;
-	// labels["rematch"].disabled = false;
 	// labels["waiting"].visible = false;
 	// resetDots(labels["waiting"]);
 	// labels["searching"].visible = false;
@@ -142,9 +146,14 @@ function cardEvent () {
 				moveCard(cardEventDetail);
 				break;
 			case 'flip':
-				// TODO: If there are multiple flips cached, grab them all to play simultaneously
+				// If there are multiple flips cached from the last play, grab them all to play simultaneously
 				debugMode && console.log(`flip card: ${cardEventDetail.location}`);
 				flipCard(cardEventDetail.location);
+				while (nextEventType('flip')) {
+					nextCardEventDetail = cardEventQueue.shift();
+					debugMode && console.log(`flip card: ${nextCardEventDetail.location}`);
+					flipCard(nextCardEventDetail.location);
+				}
 				updatePlayerStrengthValues(cardEventDetail.matchDetail);
 				break;
 			case 'draw':
@@ -155,6 +164,10 @@ function cardEvent () {
 			case 'stoplight':
 				debugMode && console.log(`canvas.renderScoreStoplight() ${JSON.stringify(cardEventDetail.matchDetail.scoreboard)}`);
 				updateScores(cardEventDetail.matchDetail);
+				break;
+			case 'enable':
+				debugMode && console.log(`enable hand: ${cardEventDetail.active}`);
+				updateActivePlayer(cardEventDetail.active);
 				break;
 			case 'end':
 				debugMode && console.log(`endMatch`);
@@ -170,6 +183,15 @@ function cardEvent () {
 		setTimeout(() => {
 			cardEvent();
 		}, ANIMATION_TIME);
+	}
+}
+
+function nextEventType (eventType) {
+	let nextEvent = cardEventQueue[0];
+	if (nextEvent && nextEvent.type === eventType) {
+		return true;
+	} else {
+		return false;
 	}
 }
 
@@ -259,21 +281,10 @@ function exitMatch () {
 	labels["result"].visible = false;
 	labels["main menu"].visible = false;
 	labels["main menu"].clickable = false;
-	labels["rematch"].visible = false;
-	labels["rematch"].clickable = false;
-	labels["rematch"].disabled = false;
 	labels["waiting"].visible = false;
 	resetDots(labels["waiting"]);
 	labels["play"].visible = true;
 	labels["play"].clickable = true;
-}
-
-function requestRematch () {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	socket.emit("request rematch");
-	labels["rematch"].visible = false;
-	labels["rematch"].clickable = false;
-	labels["waiting"].visible = true;
 }
 
 function animateLabels () {

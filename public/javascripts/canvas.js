@@ -40,7 +40,6 @@ function init() {
 	labels["play"] = new Label({x: 0.5, y: 0.9}, "Play!", 144, true, true, false, labelFont, enterQueue);
 	labels["searching"] = new Label({x: 0.5, y: 0.9}, "Searching   ", 144, false, false, false, labelFont);
 	labels["result"] = new Label({x: 0.5, y: 0.2}, "", 192, false, false, false, labelFont);
-	labels["rematch"] = new Label({x: 0.5, y: 0.9}, "Rematch", 128, false, false, false, labelFont, requestRematch);
 	labels["waiting"] = new Label({x: 0.5, y: 0.9}, "Waiting   ", 128, false, false, false, labelFont);
 	labels["main menu"] = new Label({x: 0.5, y: 0.7}, "Main Menu", 128, false, false, false, labelFont, exitMatch);
 }
@@ -226,6 +225,7 @@ function moveCard (moveDetail) {
 		// Disable the space that the moved card now occupies
 		gridSpaces[gridIndex].selectable = false;
 		gridCards[gridIndex] = card;
+		card.evented = false;
 		card.cardImageId = moveDetail.cardImageId;
 		card.gridIndex = gridIndex;
 		card.animate({shadow: '', left: gridSpaces[gridIndex].left - cardWidth / 2, top: gridSpaces[gridIndex].top}, {
