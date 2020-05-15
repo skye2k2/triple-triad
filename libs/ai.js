@@ -6,7 +6,8 @@
  * If I am playing the first card of the round, just play my lowest card in the center
  * Find all open board locations
  * Find and try high-impact locations (where the location borders more than one opponent-owned card)
- *
+ * Find and try attackable single cards
+ * Default: Play lowest card in a random available space
  */
 
 
