@@ -14,8 +14,19 @@
 let cards = require("./cards");
 let debugMode = true;
 
-
 let ai = {
+	// The game manager needs access to the card list to generate matched decks, and the AI obviously needs access to the card stats to do analysis, so we load it here as the single source of truth
+	cardList: cards,
+
+	// Since we always need to indicate the card and the location, provide a standardized function for it
+	formatPlay: function (match, myIndex, cardIndex, location) {
+		return {
+			socket: match.players[myIndex].socket,
+			cardIndex: cardIndex,
+			location: location
+		}
+	},
+
 	// Prefix and log messages, as necessary
 	log: function (logString, match, myIndex) {
 		logString = ` - ${match.players[myIndex].color} AI: ${logString}`;
@@ -28,17 +39,12 @@ let ai = {
 		}
 	},
 
-	// Since we always need to indicate the card and the location, provide a standardized function for it
-	formatPlay: function (match, myIndex, cardIndex, location) {
-		return {
-			socket: match.players[myIndex].socket,
-			cardIndex: cardIndex,
-			location: location
-		}
-	},
-
 	// Primary logic
 	play: function (match, myIndex) {
+		if (typeof myIndex === 'object') {
+			myIndex = match.players.indexOf(myIndex);
+		}
+
 		// If I am playing the first card of the round, just play my lowest card in the center
 		let bestCardIndex = this.determineMinMaxCard(match, myIndex, 'best');
 		let worstCardIndex = this.determineMinMaxCard(match, myIndex, 'worst');
@@ -67,7 +73,7 @@ let ai = {
 			// Then use the lowest-ranked option (future: that is reasonably safe)
 			// for (let i = 0; i < boardAnalysis.attackableSpaces.length; i++) {
 			// 	for (let j = 0; j < match.players[myIndex].cards.length; j++) {
-			// 		if (match.players[myIndex].cards[j] !== undefined)
+			// 		if (match.players[myIndex].cards[j])
 			// 		let captures = playCard(match.players[myIndex].socket, match.players[myIndex].cards[j], boardAnalysis.attackableSpaces[i], 'preview');
 			// 		if (captures.length > 1) {
 			// 			potentialMoves.highValue.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});

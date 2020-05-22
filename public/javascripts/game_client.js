@@ -1,9 +1,11 @@
 // This file manages the games client's logic. It's here that Socket.io connections are handled and functions from canvas.js are used to manage the game's visual appearance.
 
-let ANIMATION_TIME = 800;
+let ANIMATION_TIME = 600;
+let animationTimeout;
 let socket = io();
 let canPlayCard = false;
 let debugMode = true;
+let inLobby = true;
 let log;
 let playerColor = "";
 let playerRoundStrength = 5;
@@ -13,55 +15,70 @@ let opponentColor = "";
 let opponentRoundStrength = 5;
 let opponentRoundScore = 0;
 let opponentRunningScore;
-let cardEventQueue = [];
+let spectator = false;
+let gameEventQueue = [];
 let matchWinner, matchEndReason, readyToEnd, timerInterval;
 
 //////////  Socket Events  \\\\\\\\\\
+socket.on("lobby created", function (gameId) {
+	console.log(`${document.location.href}gameId`);
+	// TODO: Put up a placard overtop of everything else, with the link to have friends join
+});
+
 socket.on("enter match", function (matchDetail) {
+	// TODO: Add matchId to match detail, so that players can copy a link for friends to spectate
+	inLobby = false;
+	document.body.removeAttribute('in-lobby');
 	enterMatch(matchDetail);
 });
 
+// TODO: If playing a tiebreaker round, animate the cards back, instead of immediately clearing the board--maybe use a different event
 socket.on("draw hand", function (cards) {
 	// If we are in replay mode, keep from starting a new round until the current round is complete
-	if (cardEventQueue.length === 0) {
+	if (gameEventQueue.length === 0) {
 		// TODO: Add a way of acknowledging the previous round before starting the next one
 		setTimeout(() => {
 			startRound(cards);
 		}, ANIMATION_TIME);
 	} else {
-		cardEventQueue.push({type: 'draw', cards: cards});
+		gameEventQueue.push({type: 'draw', cards: cards});
 	}
 });
 
 // moveDetail format: {cardIndexInHand: 0, location: '1,1', color: 'red', cardImageId: '104'}
 socket.on("card played", function (moveDetail) {
 	moveDetail.type = 'move';
-	cardEventQueue.push(moveDetail);
-	if (cardEventQueue.length === 1) {
-		cardEvent();
-	}
+	gameEventQueue.push(moveDetail);
+	gameEvent();
 });
 
 // flipDetail format: {location: '1,1'}
 socket.on("card flipped", function (flipDetail) {
 	flipDetail.type = 'flip';
-	cardEventQueue.push(flipDetail);
-	if (cardEventQueue.length === 1) {
-		cardEvent();
-	}
+	gameEventQueue.push(flipDetail);
+	gameEvent();
 });
 
 socket.on("update score", function (matchDetail) {
-	cardEventQueue.push({type: 'stoplight', matchDetail: matchDetail});
+	gameEventQueue.push({type: 'stoplight', matchDetail: matchDetail});
+	gameEvent();
 });
 
-socket.on("enable cards", function (activePlayer) {
-	if (cardEventQueue.length === 0) {
-		setTimeout(() => {
-			updateActivePlayer(activePlayer);
-		}, ANIMATION_TIME);
-	} else {
-		cardEventQueue.push({type: 'enable', active: activePlayer});
+// NOTE: This fires 4x immediately when watching bot games, due to the match completing in under a second
+socket.on("update stats", function (stats) {
+	if (inLobby) {
+		// console.log(`update stats: ${stats}`);
+		updateGameList('.lobby-list', stats.lobbies);
+		updateGameList('.game-list', stats.matches);
+
+		// TODO: Update server stats (player/game counts, etc.), as well
+	}
+});
+
+socket.on("enable hand", function (activePlayer) {
+	if (!spectator) {
+		gameEventQueue.push({type: 'enable', active: activePlayer});
+		gameEvent();
 	}
 });
 
@@ -74,8 +91,12 @@ socket.on("replay match", function (matchDetail) {
 });
 
 socket.on("end match", function (matchDetail) {
-	cardEventQueue.push({type: 'end', matchDetail: matchDetail});
-	cardEvent(); // MAYBE?
+	gameEventQueue.push({type: 'end', matchDetail: matchDetail});
+});
+
+socket.on("no match found", function () {
+	console.log(`${window.location.pathname} match not found...redirecting...`);
+	window.location.replace("/");
 });
 
 socket.on("no rematch", function () {
@@ -84,9 +105,14 @@ socket.on("no rematch", function () {
 	}
 });
 
+// Initialize the game client
+
 // Catch the canvas play-card and rematch events, and send them on to Socket.io
+document.addEventListener('event:create-lobby', createMatch);
 document.addEventListener('event:play-card', playCard);
 document.addEventListener('event:rematch', rematch);
+
+socket.emit("request game list");
 
 //////////  Functions  \\\\\\\\\\
 function enterQueue () {
@@ -99,12 +125,16 @@ function enterQueue () {
 
 function enterMatch (matchDetail) {
 	// debugMode && console.log(`enterMatch`, matchDetail);
+	spectator = matchDetail.spectator;
 
 	playerColor = matchDetail.playerColor;
 	opponentColor = matchDetail.opponentColor;
-	playerRoundStrength = matchDetail.roundStrength[playerColor];
-	opponentRoundStrength = matchDetail.roundStrength[opponentColor];
-	cardEventQueue = [];
+	gameEventQueue = [];
+
+	// If the spectated game is already in-progress, parse out the events from the log and replay them
+	if (matchDetail.log && matchDetail.log.length) {
+		generateReplayFromLog(matchDetail);
+	}
 
 	updateScores(matchDetail);
 
@@ -118,6 +148,11 @@ function enterMatch (matchDetail) {
 	// displayCardSlots = true;
 }
 
+function createMatch (evt) {
+	debugMode && console.log("event:create-lobby", evt.detail);
+	socket.emit("create lobby", evt.detail);
+}
+
 function rematch (evt) {
 	debugMode && console.log("event:rematch", evt.detail);
 
@@ -126,68 +161,123 @@ function rematch (evt) {
 		socket.emit("request rematch");
 	} else {
 		socket.emit("leave match");
+		// TODO: Set state/show button to return to lobby
 	}
 }
 
 function playCard (evt) {
-	debugMode && console.log("event:play-card", evt.detail);
+	if (!spectator) {
+		debugMode && console.log("event:play-card", evt.detail);
 
-	socket.emit("play card", evt.detail.cardIndex, evt.detail.location);
-}
-
-// TODO: FIGURE: A single card event queue works, for now, assuming that events do not come out of order.
-// TODO: BUG: For extended matches, animation time appears to eventually drop to 0, maybe because there are extra cardEvent() calls left over.
-function cardEvent () {
-	if (isRenderComplete() && cardEventQueue.length) {
-		cardEventDetail = cardEventQueue.shift();
-		switch (cardEventDetail.type) {
-			case 'move':
-				debugMode && console.log(`play card:${cardEventDetail.location}, ${cardEventDetail.cardImageId} ${(cardEventDetail.mine) ? '(mine)' : ''}`);
-				moveCard(cardEventDetail);
-				break;
-			case 'flip':
-				// If there are multiple flips cached from the last play, grab them all to play simultaneously
-				debugMode && console.log(`flip card: ${cardEventDetail.location}`);
-				flipCard(cardEventDetail.location);
-				while (nextEventType('flip')) {
-					nextCardEventDetail = cardEventQueue.shift();
-					debugMode && console.log(`flip card: ${nextCardEventDetail.location}`);
-					flipCard(nextCardEventDetail.location);
-				}
-				updatePlayerStrengthValues(cardEventDetail.matchDetail);
-				break;
-			case 'draw':
-				debugMode && console.log(`io: draw hand --> canvas.startRound()`);
-				// TODO: Add a way of acknowledging the previous round before starting the next one
-				startRound(cardEventDetail.cards);
-				break;
-			case 'stoplight':
-				debugMode && console.log(`canvas.renderScoreStoplight() ${JSON.stringify(cardEventDetail.matchDetail.scoreboard)}`);
-				updateScores(cardEventDetail.matchDetail);
-				break;
-			case 'enable':
-				debugMode && console.log(`enable hand: ${cardEventDetail.active}`);
-				updateActivePlayer(cardEventDetail.active);
-				break;
-			case 'end':
-				debugMode && console.log(`endMatch`);
-				endMatch(cardEventDetail.matchDetail);
-				break;
-			default:
-				break;
-		}
-		setTimeout(() => {
-			cardEvent();
-		}, ANIMATION_TIME);
-	} else {
-		setTimeout(() => {
-			cardEvent();
-		}, ANIMATION_TIME);
+		socket.emit("play card", evt.detail.cardIndex, evt.detail.location);
 	}
 }
 
+// TODO: FIGURE: A single game event queue works, for now, assuming that events do not come out of order.
+// TODO: BUG: For extended matches, animation time appears to eventually drop to 0, because there are extra gameEvent() calls left over.
+function gameEvent () {
+	if (isRenderComplete()) {
+		if (gameEventQueue.length) {
+			if (animationTimeout) {
+				window.clearTimeout(animationTimeout);
+			}
+			animationTimeout = setTimeout(() => {
+				eventDetail = gameEventQueue.shift();
+				switch (eventDetail.type) {
+					case 'move':
+						debugMode && console.log(`play card:${eventDetail.location}, ${eventDetail.cardImageId} ${(eventDetail.mine) ? '(mine)' : ''}`);
+						moveCard(eventDetail);
+						break;
+					case 'flip':
+						// If there are multiple flips cached from the last play, grab them all to play simultaneously
+						debugMode && console.log(`flip card: ${eventDetail.location}`);
+						flipCard(eventDetail.location);
+						updatePlayerStrengthValues(eventDetail.matchDetail);
+						while (nextEventType('flip')) {
+							nextEventDetail = gameEventQueue.shift();
+							debugMode && console.log(`flip card: ${nextEventDetail.location}`);
+							flipCard(nextEventDetail.location);
+							updatePlayerStrengthValues(nextEventDetail.matchDetail);
+						}
+						break;
+					case 'draw':
+						debugMode && console.log(`io: draw hand --> canvas.startRound()`);
+						// TODO: Add a way of acknowledging the previous round before starting the next one
+						startRound(eventDetail.cards);
+						break;
+					case 'stoplight':
+						debugMode && console.log(`stoplight: ${JSON.stringify(eventDetail.matchDetail.scoreboard)}`);
+						updateScores(eventDetail.matchDetail);
+						break;
+					case 'enable':
+						// debugMode && console.log(`enable hand: ${eventDetail.active}`);
+						updateActivePlayer(eventDetail.active);
+						break;
+					case 'end':
+						debugMode && console.log(`endMatch`);
+						endMatch(eventDetail.matchDetail);
+						break;
+					default:
+						console.warn(`Unknown event type: ${eventDetail.type}`);
+						break;
+				}
+				gameEvent();
+			}, ANIMATION_TIME);
+		}
+	} else {
+		if (gameEventQueue.length) {
+			animationTimeout = setTimeout(() => {
+				gameEvent();
+			}, ANIMATION_TIME);
+		} else {
+			window.clearTimeout(animationTimeout);
+		}
+	}
+}
+
+function generateReplayFromLog (matchDetail) {
+	log = matchDetail.log;
+
+	playerRoundStrength = 5;
+	opponentRoundStrength = 5;
+
+	for (let i = 0; i < log.length; i++) {
+		const logBits = log[i].split(':');
+		// Log Format: {player color}:{event type}:{location}:{card index?}:{card id?}
+		// If the log entry begins with `red` or `blue`, it is an event that we need to queue up
+		if (logBits[0].includes('blue') || logBits[0].includes('red')) {
+			switch (logBits[1]) {
+				case 'play':
+					gameEventQueue.push({type: 'move', location: logBits[2], cardIndexInHand: logBits[3],  color: logBits[0], cardImageId: logBits[4], spectator: (logBits[0].includes(playerColor)) ? true : false});
+					break;
+				case 'capture':
+					// TODO: Either add the update score to the log, or always calculate it
+					if (logBits[0].includes('blue')) { // When spectating, assume the player is blue
+						playerRoundStrength++;
+						opponentRoundStrength--;
+					} else {
+						playerRoundStrength--;
+						opponentRoundStrength++;
+					}
+					gameEventQueue.push({type: 'flip', location: logBits[2], matchDetail: { roundStrength: {red: opponentRoundStrength, blue: playerRoundStrength}}});
+					break;
+				default:
+					console.warn(`Unknown log entry format: ${log[i]}`);
+					break;
+			}
+		} else if (logBits[0].includes('Begin Round')) {
+			gameEventQueue.push({type: 'draw', cards: true});
+		}
+	}
+
+	// Get things rolling, because gameEvent() cannot trigger until both hands have been rendered
+	startRound(true);
+	// IF THE FIRST ONE IS THE DRAW EVENT, WE CAN SKIP IT
+	gameEvent();
+}
+
 function nextEventType (eventType) {
-	let nextEvent = cardEventQueue[0];
+	let nextEvent = gameEventQueue[0];
 	if (nextEvent && nextEvent.type === eventType) {
 		return true;
 	} else {
@@ -201,13 +291,26 @@ function updateActivePlayer (activePlayer) {
 	} else {
 		setTimeout(() => {
 			updateActivePlayer(activePlayer);
-		}, ANIMATION_TIME);
+		}, ANIMATION_TIME * 2);
+	}
+}
+
+function updateGameList(selector, list) {
+	let listEl = document.querySelector(selector);
+	listEl.innerHTML = '';
+
+	for (let i = 0; i < list.length; i++) {
+		let match = list[i];
+		let row = document.createElement("li");
+		let score =  (selector === '.game-list') ? `(${match.runningScore.blue} - ${match.runningScore.red})` : '';
+		row.innerHTML = `<a href='/${match.id}' title='Join this match${(selector === '.game-list') ? " as a spectator" : ""}'>${match.id} ${score}</a>`;
+		listEl.appendChild(row);
 	}
 }
 
 // Any time a card is flipped, the round score values have changed, so update the numbers
 function updatePlayerStrengthValues (matchDetail) {
-	debugMode && console.log(`updatePlayerStrengthValues: ${JSON.stringify(matchDetail.roundStrength)}`);
+	debugMode && console.log(`--> ${JSON.stringify(matchDetail.roundStrength)}`);
 	renderPlayerScore(matchDetail.roundStrength[playerColor]);
 	renderPlayerScore(matchDetail.roundStrength[opponentColor], true);
 }
@@ -236,17 +339,19 @@ function endMatch (matchDetail) {
 	setTimeout(() => {
 		enableCards(true);
 		// TODO: Use game status notifications, instead of alerts
-		if (playerColor === winnerColor) {
-			playSound(fanfare);
-			// alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
-		} else if (playerColor === loserColor) {
-			playSound(loser);
-			// alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
+		if (!spectator) {
+			if (playerColor === winnerColor) {
+				playSound(fanfare);
+				// alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+			} else if (playerColor === loserColor) {
+				playSound(loser);
+				// alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
+			}
+			renderRematchBlock();
 		} else {
-			// alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		}
-		renderRematchBlock();
-	}, ANIMATION_TIME);
+	}, ANIMATION_TIME * 2);
 
 	// canPlayCard = false;
 	// readyToEnd = false;
@@ -273,6 +378,7 @@ function endMatch (matchDetail) {
 	// matchEndReason = undefined;
 }
 
+// TODO: DELETE THESE, ONCE GAME STATE IS STABLE
 function exitMatch () {
 	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
 	playerRoundStrength = 0;

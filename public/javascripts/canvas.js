@@ -116,21 +116,6 @@ let playerCards = [];
 let labels = [];
 let zoom = 1;
 
-// PROBABLY REMOVE THIS SPECIAL TREATMENT, AS IT SEEMS UNNECESSARY
-let tierColorMap = [
-	'', // There is no tier 0
-	'#24b',
-	'#24b',
-	'#24b',
-	'#24b',
-	'#24b',
-	'#94b',
-	'#94b',
-	'#94b',
-	'#ccc',
-	'#eb0',
-];
-
 init();
 
 window.addEventListener("resize", handleResize, false);
@@ -215,7 +200,7 @@ function locationToGridIndex (location) {
 
 // Given a hand card index and a location, move the given card, also revealing it, if a cardImageId is passed (always, for spectators or opponent's cards)
 function moveCard (moveDetail) {
-	let card = (moveDetail.mine) ?
+	let card = (moveDetail.mine || moveDetail.spectator) ?
 		playerCards.splice(moveDetail.cardIndexInHand, 1, undefined)[0] :
 		opponentCards.splice(moveDetail.cardIndexInHand, 1, undefined)[0];
 
@@ -232,7 +217,7 @@ function moveCard (moveDetail) {
 			duration: 500,
 			easing: fabric.util.ease.easeInOutExpo,
 			onChange: canvas.renderAll.bind(canvas),
-			onComplete: (moveDetail.mine) ? undefined: fetchCardFace.bind(card)
+			onComplete: (moveDetail.mine && !moveDetail.spectator) ? undefined: fetchCardFace.bind(card)
 		});
 	}
 }
@@ -266,14 +251,19 @@ function flipCard (cardToFlip) {
 		cardToFlip = gridCards[locationToGridIndex(cardToFlip)];
 	}
 
-	if (cardToFlip.color) {
-		cardToFlip.color = (cardToFlip.color === 'red') ? 'blue' : 'red';
+	if (cardToFlip.mine) {
+		// Catch the flip event correctly for spectators, and then remove the short-circuit
+		delete cardToFlip.mine;
+		cardToFlip.color = 'blue'; // When spectating, assume the player is blue
 	} else {
-		cardToFlip.color = (playerColor === 'red') ? 'blue' : 'red';
+		if (cardToFlip.color) {
+			cardToFlip.color = (cardToFlip.color === 'red') ? 'blue' : 'red';
+		} else {
+			cardToFlip.color = (playerColor === 'red') ? 'blue' : 'red';
+		}
 	}
 
 	let imageToFilter = (cardToFlip._objects && (cardToFlip._objects[1] || cardToFlip._objects[0]));
-
 	if (cardToFlip.color === playerColor) {
 		imageToFilter.applyFilters([]); // Cheap way to clear filters, since we don't know if any filters are currently being applied
 	} else {
@@ -327,6 +317,9 @@ function renderHand (cards, isOpponent) {
 	if (!cards) {
 		cards = [{}, {}, {}, {}, {}];
 		isOpponent = true;
+	} else if (cards === true) {
+		cards = [{}, {}, {}, {}, {}];
+		isOpponent = false;
 	}
 	for (let i = 0; i < cards.length; i++) {
 		renderCard(cards[i], i, isOpponent);
@@ -375,8 +368,10 @@ function renderCard (card, slot, isOpponent) {
 
 	if (!card) {return console.log(`ERROR rendering card[${slot}] for ${(isOpponent) ? 'opponent' : 'player'}`);}
 
+	let cardURL = (isOpponent || !card.id) ? `images/cards/back.png` : `images/cards/${card.id}.png`;
+
 	if (isOpponent && !card.id) {
-		fabric.Image.fromURL(`images/cards/back.png`, (img) => {
+		fabric.Image.fromURL(cardURL, (img) => {
 			img = img.scaleToWidth(cardWidth);
 			// In theory, we could invert the opponent's cards
 			// img.filters.push(new fabric.Image.filters.Invert());
@@ -398,12 +393,12 @@ function renderCard (card, slot, isOpponent) {
 			canvas.renderAll();
 		});
 	} else {
-		fabric.Image.fromURL(`images/cards/${card.id}.png`, (img) => {
+		fabric.Image.fromURL(cardURL, (img) => {
 			img = img.scaleToWidth(cardWidth);
 			img.filters = [new fabric.Image.filters.Grayscale()]; // Add flipping filter to every card
 			cardGroup = new fabric.Group([ img ], Object.assign({
-				// backgroundColor: tierColorMap[card.tier] // AFTER CARDS HAVE TRANSPARENT BACKGROUNDS
-				borderColor: tierColorMap[card.tier],
+				borderColor: '#24b',
+				evented: (!card.id) ? false : true,
 				// originX: 'center',
 				// originY: 'center',
 				// left: cardWidth,
@@ -414,6 +409,8 @@ function renderCard (card, slot, isOpponent) {
 
 			// Add card data to be used with card placement eventing
 			cardGroup.cardIndex = slot;
+			cardGroup.color = (isOpponent) ? opponentColor : playerColor;
+			cardGroup.mine = spectator;
 
 			// console.log(`renderCard (player): ${slot}`);
 
