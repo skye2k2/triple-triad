@@ -41,9 +41,21 @@ app.get("/", (req, res) => {
 	// Will serve static pages, no need to handle requests
 });
 
-// If any page not handled already handled (ie. doesn't exist)
+// User/spectator requests a specific match
+app.get( '^/:matchId([ACDEFGHJKLMNPRTUWXY3679]{4})', (req, res) => {
+	// console.log(`Connection request for match: ${req.params.matchId}`);
+	// Forward lowercase requests to uppercase routes
+	if (/[a-z]/.test(req.params.matchId)) {
+		res.redirect(301, `/${req.params.matchId.toUpperCase()}`);
+	} else {
+		res.sendFile('index.html', {root: './public'});
+	}
+});
+
+// 404 catch-all for routes not matched
 app.get("*", (req, res) => {
-	res.status(404).send("Error 404 - Page not found");
+	// TODO: Just send them back to the lobby, and show a note that the match could not be found
+	res.status(404).send("Error 404 - Game not found");
 });
 
 // Start http server

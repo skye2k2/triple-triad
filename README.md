@@ -4,6 +4,15 @@ Based on a game that once existed in our universe. No ads, no cost, no third-par
 
 Built with Node.js, Socket.io, and FabricJS.
 
+## Stats and Performance
+
+Client initial load weighs in at < 650KB, and utilizes heavy caching for all resources, so that subsequent views are < 50KB.
+Node server runs empty at < 20MB of RAM, with 11 threads.
+
+- Each subsequent/simultaneous match (mostly because of the running game log) adds < 2MB of memory usage, and is mostly reclaimed when the connection ends
+- Running game logic for three fully automated bot matches does not spike above 3% CPU utilization on a 2.2 GHz core i7 processor (thanks, Socket.io!)
+- Extrapolated theory: 100 simultaneous human matches can run with minimal disruption to the event loop (TODO: Test this)
+
 ## How to play
 
 [Short Rule Summary](http://www.vyseri.com/images/tripletriad2.png)
@@ -29,16 +38,18 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Sound effects for playing and flipping cards, and winning and losing the match
 - Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce in time to the music)
 - Immediate rematch option given to both players
+- Basic AI
+- Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
+  - After the second player has joined, anyone else will be a spectator
+  - Allow spectators to connect to matches in progress (replay from game log)
+  - List matches in progress on home screen
+  - Play against bot opponent
 
 #### TODO List:
 
 - HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
 - Perfectly centered game board and title positioning
 - Add board background art
-- Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
-  - Similarly, after the second player has joined, anyone else will just be a spectator (tricky bit)
-  - Allow spectators to connect to matches in progress (replay from game log)
-  - List matches in progress on home screen
 - Allow users to choose names (maybe from a selection of FF VIII characters, to avoid vulgarity)
 - Add 30-second countdown timer per turn + autoplay functionality (initial logic for AI bots, just play the first card found that can capture an opponent's card, or the most defensive card available)
 - Add keyboard/controller support
@@ -47,7 +58,6 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Add all extended game rule options (Open, Chain, Plus)
 - Stress tester script, to see how many active games can run at a time, and limit games to that upper bound, to ensure a minimum performance level (https://stackoverflow.com/a/16426868/5334305)
 - See about adding to https://www.crazygames.com/c/io
-- Create AI bot node clients, and allow player to choose to wait for a human or have a bot opponent
 - Allow page refresh without quitting match
 - Add minimal analytics (number of players/matches/final score)
 - Add fun Final Fantasy VIII facts to push to clients while waiting for a game

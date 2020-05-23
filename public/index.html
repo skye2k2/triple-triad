@@ -14,6 +14,10 @@ Welcome, adventurer!
 				background-color: #210;
 			}
 
+			#content {
+				position: relative;
+			}
+
 			.canvas-container {
 				margin: 0 auto;
 				transition: opacity 0.2s;
@@ -31,6 +35,105 @@ Welcome, adventurer!
 				background-size: contain;
 				border: 3px double #000;
 				z-index: 0;
+			}
+
+			.overlay {
+				background-color: rgba(221, 170, 68, 0.75);
+				bottom: 0;
+				display: none;
+				left: 5vw;
+				position: absolute;
+				right: 5vw;
+				top: 0;
+			}
+
+			[lurking] .overlay,
+			[inlobby] .overlay {
+				display: block;
+			}
+
+			.games-list {
+				display: flex;
+			}
+
+			.list-container {
+				display: flex;
+    		flex-direction: column;
+				width: 50%;
+			}
+
+			.lobby-list,
+			.game-list {
+				margin: 0 10px 54px 10px;
+				overflow: scroll;
+				padding: 0;
+			}
+
+			.lobby-list li,
+			.game-list li {
+
+				list-style: none;
+				margin: 1px 0;
+				position: relative;
+			}
+
+			.lobby-list li::before,
+			.game-list li::before {
+				background-image: url('/images/cards/back.png');
+				background-size: contain;
+				border-radius: 3px;
+				content: '';
+				display: inline-block;
+				height: 100%;
+				left: 0;
+				pointer-events: none;
+				position: absolute;
+				width: 1.15rem;
+			}
+
+			.billboard {
+				align-items: center;
+				background-color: rgba(221, 170, 68, 0.5);
+				bottom: 0;
+				display: none;
+				flex-direction: column;
+				left: 0;
+				padding: 20%;
+				position: absolute;
+				right: 0;
+				text-align: center;
+				top: 0;
+			}
+
+			[inlobby] .billboard {
+				display: flex;
+			}
+
+			.game-link {
+				margin: 0;
+				padding: 20px;
+			}
+
+			.game-link,
+			a {
+				font-family: "Lucida Console", Monaco, monospace;
+				font-size: larger;
+			}
+
+			.lobby-list a,
+			.game-list a {
+				padding-left: 1.5rem;
+			}
+
+			a,
+			a:active,
+			a:visited {
+				color: #210;
+				text-decoration: none;
+			}
+
+			a:hover {
+				text-decoration: underline;
 			}
 
 			[disabled] {
@@ -53,6 +156,27 @@ Welcome, adventurer!
 				min-width: 1rem;
 				padding: 5px;
 				position: absolute;
+			}
+
+			.match-buttons {
+				bottom: 0;
+				display: flex;
+				position: absolute;
+				width: 100%;
+			}
+
+			[inlobby] .match-buttons {
+				display: none;
+			}
+
+			.create-public-match,
+			.create-private-match,
+			.create-bot-match {
+				position: relative;
+			}
+
+			.create-bot-match {
+				margin: 0 auto;
 			}
 
 			.help-button {
@@ -98,47 +222,67 @@ Welcome, adventurer!
 		</style>
 	</head>
 
-	<body>
+	<body lurking>
 		<div id="content">
 			<canvas id="fabric-canvas" class="center-block" width="0" height="0"></canvas>
 
-			<!-- <section>
-				<h3>TODO: Active Games</h3>
-				<ul>
-					<li><a href="/watch/"> (round <span class="round-number">3</span>)</a></li>
-				</ul>
-			</section> -->
+			<div class="overlay">
+				<div class="games-list">
+					<section class="list-container">
+						<h3>Lobbies (click to join):</h3>
+						<ul class="lobby-list">
+						</ul>
+					</section>
+					<section class="list-container">
+						<h3>Active Games (click to spectate):</h3>
+						<ul class="game-list">
+						</ul>
+					</section>
+					<div class="match-buttons">
+						<button class="create-public-match" onclick="createMatch()">Create Public Match</button>
+						<button class="create-bot-match" onclick="createMatch(true, true)">Practice against Bot</button>
+						<button class="create-private-match" onclick="createMatch(true)">Create Private Match</button>
+					</div>
+				</div>
 
-			<button class="help-button" type="button" title="How To Play Triple Triad" onclick="showHowToPlay()">♕?</button>
-			<button class="music-button" type="button" title="Toggle Music" onclick="toggleMusic(this)"><span class="note-1 bounce">♪</span>&nbsp;<span class="note-2 bounce">♬</span></button>
-			<div id="how-to-play" class="fullscreen" onclick="hideHowToPlay()" hidden>
-				<h1>How To Play Triple Triad</h1>
-				<p>
-					Triple Triad is a two-player game played on a three-by-three (3x3) square grid. Each card has four numbers (known as ranks) placed in top left corner; each number corresponds to one of the four sides of the card. The ranks range from one to ten, the letter A representing ten. Colored cards belong to the player and monochromatic cards belong to the opponent.
-				</p><p>
-					In each round, a player is dealt five cards from their deck. The first player is randomly chosen for the first round, and then switches between players for each subsequent round. Each player then alternates playing a single card onto any unoccupied space on the board.
-				</p>
-				<h2>Winning</h2>
-				<p>
-					To win a round, a majority of the total ten cards played (including the one card that is not placed on the board) must be controlled by a player. To capture an opponent's card, the active player places a card adjacent to it. If the rank touching the opponent's card is higher, the opponent's card will be captured and flipped to the player's color. The player who goes second will have a card remaining in their hand and that card will count towards their ending score.
-				</p><p>
-					A draw occurs if at the end of the round the player and the opponent control an equal number of cards. The round then proceeds into a sudden death tiebreaker scenario where each player receives the cards they currently control as a new hand, and the round is repeated until a winner is decided.
-				</p><p>
-					Matches are played best out of three rounds.
-				<h2>Rules</h2>
-				<h3>Random (always enabled)</h3>
-				<p>
-					In order to better balance gameplay, a ten-card deck, with one card coming from each of the ten ranks of cards, is randomly generated for each player at the beginning of each match. Players then draw two five-card hands for the first two rounds of the match. If a match winner is still undecided after two rounds, a final high-power hand is randomly generated with one card from each of only the top five tiers.
-				</p>
-				<h3>Basic</h3>
-				</p><p>
-					The default mode of gameplay. An opponent's card can only be captured by a player's card being placed orthogonally adjacent to it that is more powerful than the opponent's card in the shared direction.
-				</p>
-				<h3>Unimplemented</h3>
-				<p>
-					The following have yet to be implemented: Same, Same Wall, Plus, Combo, and Elemental.
-				</p>
+				<div class="billboard">
+					<h2>Send this link to a friend:</h2>
+					<p class="game-link"></p>
+					<p class="subtext">After the first person has joined, the match will begin,<br/>and anyone else using the link will be able to spectate.</p>
+					<p>OR, <button onclick="cancelMatch()">go back</button> to lobbies</p>
+				</div>
 			</div>
+
+		</div>
+		<button class="help-button" type="button" title="How To Play Triple Triad" onclick="showHowToPlay()">♕?</button>
+		<button class="music-button" type="button" title="Toggle Music" onclick="toggleMusic(this)"><span class="note-1 bounce">♪</span>&nbsp;<span class="note-2 bounce">♬</span></button>
+		<div id="how-to-play" class="fullscreen" onclick="hideHowToPlay()" hidden>
+			<h1>How To Play Triple Triad</h1>
+			<p>
+				Triple Triad is a two-player game played on a three-by-three (3x3) square grid. Each card has four numbers (known as ranks) placed in top left corner; each number corresponds to one of the four sides of the card. The ranks range from one to ten, the letter A representing ten. Colored cards belong to the player and monochromatic cards belong to the opponent.
+			</p><p>
+				In each round, a player is dealt five cards from their deck. The first player is randomly chosen for the first round, and then switches between players for each subsequent round. Each player then alternates playing a single card onto any unoccupied space on the board.
+			</p>
+			<h2>Winning</h2>
+			<p>
+				To win a round, a majority of the total ten cards played (including the one card that is not placed on the board) must be controlled by a player. To capture an opponent's card, the active player places a card adjacent to it. If the rank touching the opponent's card is higher, the opponent's card will be captured and flipped to the player's color. The player who goes second will have a card remaining in their hand and that card will count towards their ending score.
+			</p><p>
+				A draw occurs if at the end of the round the player and the opponent control an equal number of cards. The round then proceeds into a sudden death tiebreaker scenario where each player receives the cards they currently control as a new hand, and the round is repeated until a winner is decided.
+			</p><p>
+				Matches are played best out of three rounds.
+			<h2>Rules</h2>
+			<h3>Random (always enabled)</h3>
+			<p>
+				In order to better balance gameplay, a ten-card deck, with one card coming from each of the ten ranks of cards, is randomly generated for each player at the beginning of each match. Players then draw two five-card hands for the first two rounds of the match. If a match winner is still undecided after two rounds, a final high-power hand is randomly generated with one card from each of only the top five tiers.
+			</p>
+			<h3>Basic</h3>
+			</p><p>
+				The default mode of gameplay. An opponent's card can only be captured by a player's card being placed orthogonally adjacent to it that is more powerful than the opponent's card in the shared direction.
+			</p>
+			<h3>Unimplemented</h3>
+			<p>
+				The following have yet to be implemented: Same, Same Wall, Plus, Combo, and Elemental.
+			</p>
 		</div>
 
 		<script src="/socket.io/socket.io.js"></script>
@@ -217,6 +361,18 @@ Welcome, adventurer!
 
 			function showHowToPlay () {
 				document.querySelector('#how-to-play').removeAttribute('hidden');
+			}
+
+			function cancelMatch () {
+				document.dispatchEvent(new CustomEvent('event:cancel-lobby'));
+			}
+
+			function createMatch (private, bot) {
+				document.dispatchEvent(new CustomEvent('event:create-lobby', { detail: {
+					private: (private) ? true : false,
+					rules: "BASIC",
+					solo: (bot) ? true : false,
+				}}));
 			}
 
 			// Clicks will fall through all the way to the content wrapper, if the canvas is disabled
