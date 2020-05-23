@@ -25,7 +25,8 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 
 ## Changelog:
 
-**Version 0.1.0 - 2020-05-23 (initial functionality)**
+<details>
+<summary>Version 0.1.0 - 2020-05-23 (initial functionality)</summary>
 
 ![Version 0.1.0 Lobby Image](_extra/screenshots/v0.1.0-lobby.png)
 ![Version 0.1.0 Game Image](_extra/screenshots/v0.1.0-game.png)
@@ -48,9 +49,10 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Server-side validation of cards & card placement, to keep things from being too easy for hackers
 - Sound effects for playing and flipping cards, and winning and losing the match
 - Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce in time to the music)
+</details>
 
 <details>
-<summary>**Work-in-Progress Corner**</summary>
+<summary>Work-in-Progress Corner</summary>
 
 #### TODO List:
 
@@ -63,7 +65,6 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Add effects for clicking rematch buttons, with indicator of if opponent wants a rematch
 - Add hover effect outline for target location when dragging card
 - Stress tester script, to see how many active games can run at a time, and limit games to that upper bound, to ensure a minimum performance level (https://stackoverflow.com/a/16426868/5334305)
-
 
 #### Idea Stack:
 
