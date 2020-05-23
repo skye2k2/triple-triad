@@ -45,10 +45,10 @@ let ai = {
 			myIndex = match.players.indexOf(myIndex);
 		}
 
-		// If I am playing the first card of the round, just play my lowest card in the center
 		let bestCardIndex = this.determineMinMaxCard(match, myIndex, 'best');
 		let worstCardIndex = this.determineMinMaxCard(match, myIndex, 'worst');
 
+		// If I am playing the first card of the round, just play my lowest card in the center
 		if (this.isBoardEmpty(match)) {
 			this.log(`board is empty--playing worst card in the center`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
@@ -59,15 +59,45 @@ let ai = {
 			successful: [],
 			unsuccessful: []
 		};
+		let priorityTargets;
 		let boardAnalysis = this.parseGameBoard(match, myIndex);
 
 		// console.log(boardAnalysis);
 
-		if (boardAnalysis.highValueAttackSpaces.length) {
-			this.log(`playing best card in a high-value attackable space`, match, myIndex);
-			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.attackableSpaces));
+		// If there is overlap between high-value attack and high-value defense spaces, play my best card
+		if (boardAnalysis.highValueAttackSpaces.length && boardAnalysis.highValueDefenseSpaces.length) {
+			priorityTargets = boardAnalysis.highValueAttackSpaces.filter(value => boardAnalysis.highValueDefenseSpaces.includes(value));
+			if (priorityTargets.length) {
+				this.log(`playing best card in an ultra high-value attackable/defendable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, bestCardIndex, priorityTargets[0]);
+			}
 		}
 
+		// If there are high-value attackable spaces, play my best card
+		if (boardAnalysis.highValueAttackSpaces.length) {
+			priorityTargets = boardAnalysis.highValueAttackSpaces.filter(value => boardAnalysis.defendableSpaces.includes(value));
+			if (priorityTargets.length) {
+				this.log(`playing best card in a doubly high-value attackable/defendable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, bestCardIndex, priorityTargets[0]);
+			} else {
+				this.log(`playing best card in a high-value attackable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, bestCardIndex, this.pickRandomItem(boardAnalysis.highValueAttackSpaces));
+			}
+		}
+
+		// If there are no high-value attackable spaces, play in a defensible position to keep cards I own
+		if (boardAnalysis.highValueDefenseSpaces.length) {
+			priorityTargets = boardAnalysis.highValueDefenseSpaces.filter(value => boardAnalysis.attackableSpaces.includes(value));
+			if (priorityTargets.length) {
+				this.log(`playing worst card in a doubly high-value defendable/attackable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, priorityTargets[0]);
+			} else {
+				this.log(`playing worst card in a high-value defendable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.highValueDefenseSpaces));
+			}
+		}
+
+		// If there are standard attackable spaces, play my worst card to attack
 		if (boardAnalysis.attackableSpaces.length) {
 			// Try each card in hand, to see which result in a successful attack
 			// Then use the lowest-ranked option (future: that is reasonably safe)
@@ -88,7 +118,14 @@ let ai = {
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.attackableSpaces));
 		}
 
+		// If there are no attackable spaces, play in a defensible position to keep cards I own
+		if (boardAnalysis.defendableSpaces.length) {
+			this.log(`playing worst card in a defendable space`, match, myIndex);
+			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.defendableSpaces));
+		}
+
 		// If there are no appealing options, just play my lowest card in an available space
+		// TODO: OR play a high-defense card in its power corner
 		if (boardAnalysis.openSpaces.length) {
 			this.log(`no good options--playing worst card in a random open space`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
@@ -106,6 +143,7 @@ let ai = {
 	parseGameBoard: function (match, myIndex) {
 		let parsedGameBoard = {
 			attackableSpaces: [],
+			defendableSpaces: [],
 			highValueAttackSpaces: [],
 			highValueDefenseSpaces: [],
 			openSpaces: [],
@@ -130,6 +168,8 @@ let ai = {
 			}
 		}
 
+		// TODO: Optimize the duplicate code
+
 		// Add anything next to opponent's spaces that is part of openSpaces to attackableSpaces, repeat spaces are fine, and used as data for the following block
 		for (let i = 0; i < parsedGameBoard.opponentOwnedSpaces.length; i++) {
 			let attackLocationList = this.findLocationsToAttackFrom(parsedGameBoard.openSpaces, parsedGameBoard.opponentOwnedSpaces[i]);
@@ -139,6 +179,20 @@ let ai = {
 		// Add any duplicate entries from attackableSpaces to highValueAttackSpaces
 		parsedGameBoard.highValueAttackSpaces = parsedGameBoard.attackableSpaces.reduce(function(accumulator, currentSpace, currentIndex) {
 			if (parsedGameBoard.attackableSpaces.indexOf(currentSpace) !== currentIndex && accumulator.indexOf(currentSpace) < 0) {
+				accumulator.push(currentSpace);
+			}
+			return accumulator;
+		}, []);
+
+		// Add anything next to player's spaces that is part of openSpaces to defendableSpaces, repeat spaces are fine, and used as data for the following block
+		for (let i = 0; i < parsedGameBoard.ownedSpaces.length; i++) {
+			let attackLocationList = this.findLocationsToAttackFrom(parsedGameBoard.openSpaces, parsedGameBoard.ownedSpaces[i]);
+			parsedGameBoard.defendableSpaces = parsedGameBoard.defendableSpaces.concat(attackLocationList);
+		}
+
+		// Add any duplicate entries from attackableSpaces to highValueDefenseSpaces
+		parsedGameBoard.highValueDefenseSpaces = parsedGameBoard.defendableSpaces.reduce(function(accumulator, currentSpace, currentIndex) {
+			if (parsedGameBoard.defendableSpaces.indexOf(currentSpace) !== currentIndex && accumulator.indexOf(currentSpace) < 0) {
 				accumulator.push(currentSpace);
 			}
 			return accumulator;

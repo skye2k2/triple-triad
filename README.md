@@ -39,14 +39,14 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce in time to the music)
 - Immediate rematch option given to both players
 - Basic AI
+- Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
+  - After the second player has joined, anyone else will be a spectator
+  - Allow spectators to connect to matches in progress (replay from game log)
+  - List matches in progress on home screen
+  - Play against bot opponent
 
 #### TODO List:
 
-- IN-PROGRESS: Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
-  - After the second player has joined, anyone else will just be a spectator (tricky bit)
-  - Allow spectators to connect to matches in progress (replay from game log)
-  - List matches in progress on home screen
-- Allow player to choose to wait for a human or have a bot opponent
 - HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
 - Perfectly centered game board and title positioning
 - Add board background art

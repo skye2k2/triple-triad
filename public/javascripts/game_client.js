@@ -1,34 +1,31 @@
 // This file manages the games client's logic. It's here that Socket.io connections are handled and functions from canvas.js are used to manage the game's visual appearance.
 
+let socket = io();
+
 let ANIMATION_TIME = 600;
 let animationTimeout;
-let socket = io();
 let canPlayCard = false;
 let debugMode = true;
-let inLobby = true;
+let gameEventQueue = [];
 let log;
 let playerColor = "";
-let playerRoundStrength = 5;
 let playerRoundScore = 0;
+let playerRoundStrength = 5;
 let playerRunningScore;
 let opponentColor = "";
-let opponentRoundStrength = 5;
 let opponentRoundScore = 0;
+let opponentRoundStrength = 5;
 let opponentRunningScore;
 let spectator = false;
-let gameEventQueue = [];
+let state = 'lurking';
 let matchWinner, matchEndReason, readyToEnd, timerInterval;
 
 //////////  Socket Events  \\\\\\\\\\
-socket.on("lobby created", function (gameId) {
-	console.log(`${document.location.href}gameId`);
-	// TODO: Put up a placard overtop of everything else, with the link to have friends join
+socket.on("lobby created", function (matchId) {
+	enterLobby(matchId);
 });
 
 socket.on("enter match", function (matchDetail) {
-	// TODO: Add matchId to match detail, so that players can copy a link for friends to spectate
-	inLobby = false;
-	document.body.removeAttribute('in-lobby');
 	enterMatch(matchDetail);
 });
 
@@ -66,7 +63,7 @@ socket.on("update score", function (matchDetail) {
 
 // NOTE: This fires 4x immediately when watching bot games, due to the match completing in under a second
 socket.on("update stats", function (stats) {
-	if (inLobby) {
+	if (state === 'lurking') {
 		// console.log(`update stats: ${stats}`);
 		updateGameList('.lobby-list', stats.lobbies);
 		updateGameList('.game-list', stats.matches);
@@ -109,22 +106,33 @@ socket.on("no rematch", function () {
 
 // Catch the canvas play-card and rematch events, and send them on to Socket.io
 document.addEventListener('event:create-lobby', createMatch);
+document.addEventListener('event:cancel-lobby', cancelMatch);
 document.addEventListener('event:play-card', playCard);
 document.addEventListener('event:rematch', rematch);
 
 socket.emit("request game list");
 
 //////////  Functions  \\\\\\\\\\
-function enterQueue () {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	socket.emit("enter queue");
-	labels["play"].visible = false;
-	labels["play"].clickable = false;
-	labels["searching"].visible = true;
+function setState (state) {
+	state = state;
+	// Remove all attributes, then add the current one
+	[...document.body.attributes].forEach((attr) => {
+		document.body.removeAttribute(attr.name)
+	});
+	document.body.setAttribute(state, true);
+}
+
+function enterLobby (matchId) {
+	// console.log(`${document.location.href}${matchId}`);
+	document.querySelector('.game-link').innerHTML = `${document.location.href}${matchId}`;
+	matchId = matchId;
+	setState('inlobby');
 }
 
 function enterMatch (matchDetail) {
 	// debugMode && console.log(`enterMatch`, matchDetail);
+	setState('ingame');
+
 	spectator = matchDetail.spectator;
 
 	playerColor = matchDetail.playerColor;
@@ -137,20 +145,17 @@ function enterMatch (matchDetail) {
 	}
 
 	updateScores(matchDetail);
-
-	// labels["result"].visible = false;
-	// labels["main menu"].visible = false;
-	// labels["main menu"].clickable = false;
-	// labels["waiting"].visible = false;
-	// resetDots(labels["waiting"]);
-	// labels["searching"].visible = false;
-	// resetDots(labels["searching"]);
-	// displayCardSlots = true;
 }
 
 function createMatch (evt) {
 	debugMode && console.log("event:create-lobby", evt.detail);
 	socket.emit("create lobby", evt.detail);
+}
+
+function cancelMatch (evt) {
+	debugMode && console.log("event:cancel-lobby");
+	socket.emit("cancel lobby", evt.detail);
+	setState('lurking');
 }
 
 function rematch (evt) {
@@ -174,7 +179,6 @@ function playCard (evt) {
 }
 
 // TODO: FIGURE: A single game event queue works, for now, assuming that events do not come out of order.
-// TODO: BUG: For extended matches, animation time appears to eventually drop to 0, because there are extra gameEvent() calls left over.
 function gameEvent () {
 	if (isRenderComplete()) {
 		if (gameEventQueue.length) {
@@ -353,13 +357,6 @@ function endMatch (matchDetail) {
 		}
 	}, ANIMATION_TIME * 2);
 
-	// canPlayCard = false;
-	// readyToEnd = false;
-	// displayCardSlots = false;
-	// for (var i = 0; i < handSlots.length; i++) {
-	// 	handSlots[i].card = undefined;
-	// }
-
 	// if (matchEndReason === "player left") {
 	// 	var reason = ["Your opponent", "You"][+(socket.id !== matchWinner)] + " left the match";
 	// 	labels["rematch"].disabled = true;
@@ -368,14 +365,6 @@ function endMatch (matchDetail) {
 	// 	var reason = ["Your opponent has", "You have"][+(socket.id === matchWinner)] + " a full set";
 	// 	labels["rematch"].clickable = true;
 	// }
-
-	// labels["result"].text = ["You Lose!", "You Win!"][+(socket.id === matchWinner)];
-	// labels["result"].visible = true;
-	// labels["rematch"].visible = true;
-	// labels["main menu"].visible = true;
-	// labels["main menu"].clickable = true;
-	// matchWinner = undefined;
-	// matchEndReason = undefined;
 }
 
 // TODO: DELETE THESE, ONCE GAME STATE IS STABLE
@@ -384,30 +373,4 @@ function exitMatch () {
 	playerRoundStrength = 0;
 	opponentRoundStrength = 5;
 	socket.emit("leave match");
-	labels["result"].visible = false;
-	labels["main menu"].visible = false;
-	labels["main menu"].clickable = false;
-	labels["waiting"].visible = false;
-	resetDots(labels["waiting"]);
-	labels["play"].visible = true;
-	labels["play"].clickable = true;
-}
-
-function animateLabels () {
-	var dotLabels = [labels["waiting"], labels["searching"]];
-	for (var i = 0; i < dotLabels.length; i++) {
-		if (dotLabels[i].visible) {
-			updateDots(dotLabels[i]);
-		}
-	}
-}
-
-function updateDots (label) {
-	var dots = label.text.split(".").length - 1;
-	var newDots = ((dots + 1) % 4);
-	label.text = label.text.slice(0, -3) + Array(newDots + 1).join(".") + Array(3 - newDots + 1).join(" ");
-}
-
-function resetDots (label) {
-	label.text = label.text.slice(0, -3) + "...";
 }

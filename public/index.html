@@ -37,7 +37,7 @@ Welcome, adventurer!
 				z-index: 0;
 			}
 
-			.games-list {
+			.overlay {
 				background-color: rgba(221, 170, 68, 0.75);
 				bottom: 0;
 				display: none;
@@ -47,7 +47,12 @@ Welcome, adventurer!
 				top: 0;
 			}
 
-			[in-lobby] .games-list {
+			[lurking] .overlay,
+			[inlobby] .overlay {
+				display: block;
+			}
+
+			.games-list {
 				display: flex;
 			}
 
@@ -66,7 +71,7 @@ Welcome, adventurer!
 
 			.lobby-list li,
 			.game-list li {
-				font-size: larger;
+
 				list-style: none;
 				margin: 1px 0;
 				position: relative;
@@ -83,12 +88,40 @@ Welcome, adventurer!
 				left: 0;
 				pointer-events: none;
 				position: absolute;
-				width: 1rem;
+				width: 1.15rem;
+			}
+
+			.billboard {
+				align-items: center;
+				background-color: rgba(221, 170, 68, 0.5);
+				bottom: 0;
+				display: none;
+				flex-direction: column;
+				left: 0;
+				padding: 20%;
+				position: absolute;
+				right: 0;
+				text-align: center;
+				top: 0;
+			}
+
+			[inlobby] .billboard {
+				display: flex;
+			}
+
+			.game-link {
+				margin: 0;
+				padding: 20px;
+			}
+
+			.game-link,
+			a {
+				font-family: "Lucida Console", Monaco, monospace;
+				font-size: larger;
 			}
 
 			.lobby-list a,
 			.game-list a {
-				font-family: "Lucida Console", Monaco, monospace;
 				padding-left: 1.5rem;
 			}
 
@@ -130,6 +163,10 @@ Welcome, adventurer!
 				display: flex;
 				position: absolute;
 				width: 100%;
+			}
+
+			[inlobby] .match-buttons {
+				display: none;
 			}
 
 			.create-public-match,
@@ -185,25 +222,34 @@ Welcome, adventurer!
 		</style>
 	</head>
 
-	<body in-lobby>
+	<body lurking>
 		<div id="content">
 			<canvas id="fabric-canvas" class="center-block" width="0" height="0"></canvas>
 
-			<div class="games-list">
-				<section class="list-container">
-					<h3>Lobbies (click to join):</h3>
-					<ul class="lobby-list">
-					</ul>
-				</section>
-				<section class="list-container">
-					<h3>Active Games (click to spectate):</h3>
-					<ul class="game-list">
-					</ul>
-				</section>
-				<div class="match-buttons">
-					<button class="create-public-match" onclick="createMatch()">Create Public Match</button>
-					<button class="create-bot-match" onclick="createMatch(true, true)">Practice against Bot</button>
-					<button class="create-private-match" onclick="createMatch(true)">Create Private Match</button>
+			<div class="overlay">
+				<div class="games-list">
+					<section class="list-container">
+						<h3>Lobbies (click to join):</h3>
+						<ul class="lobby-list">
+						</ul>
+					</section>
+					<section class="list-container">
+						<h3>Active Games (click to spectate):</h3>
+						<ul class="game-list">
+						</ul>
+					</section>
+					<div class="match-buttons">
+						<button class="create-public-match" onclick="createMatch()">Create Public Match</button>
+						<button class="create-bot-match" onclick="createMatch(true, true)">Practice against Bot</button>
+						<button class="create-private-match" onclick="createMatch(true)">Create Private Match</button>
+					</div>
+				</div>
+
+				<div class="billboard">
+					<h2>Send this link to a friend:</h2>
+					<p class="game-link"></p>
+					<p class="subtext">After the first person has joined, the match will begin,<br/>and anyone else using the link will be able to spectate.</p>
+					<p>OR, <button onclick="cancelMatch()">go back</button> to lobbies</p>
 				</div>
 			</div>
 
@@ -315,6 +361,10 @@ Welcome, adventurer!
 
 			function showHowToPlay () {
 				document.querySelector('#how-to-play').removeAttribute('hidden');
+			}
+
+			function cancelMatch () {
+				document.dispatchEvent(new CustomEvent('event:cancel-lobby'));
 			}
 
 			function createMatch (private, bot) {

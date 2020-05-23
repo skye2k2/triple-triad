@@ -79,11 +79,15 @@ module.exports.listen = function (app) {
 
 		socket.on("disconnect", function () {
 			// console.log("Your opponent disconnected. Waiting 10 seconds to see if they reconnect, before they automatically forfeit the match.");
-			playerDisconnectedFromMatch(socket);
+			playerDisconnected(socket);
 		});
 
 		socket.on("create lobby", function (detail) {
 			startLobby(socket, detail);
+		});
+
+		socket.on("cancel lobby", function () {
+			leaveMatch(socket);
 		});
 
 		socket.on("play card", function (index, location) {
@@ -310,6 +314,11 @@ function findMatchBySocketId (socketId) {
 			}
 		}
 	}
+	for (var i = 0; i < lobbies.length; i++) {
+		if (lobbies[i].lobbyLeader.socket.id === socketId) {
+			return lobbies[i];
+		}
+	}
 	return false;
 }
 
@@ -325,17 +334,18 @@ function findPlayerBySocketId (socketId) {
 function leaveMatch (socket) {
 	var match = findMatchBySocketId(socket.id);
 	if (match) {
-		if (!match.isOver) {
-			var winner = match.players[match.players[0].socket.id !== socket.id ? 0 : 1];
-			// endMatch(match, winner, "player left");
-		} else {
-			io.to(match.matchId).emit("no rematch");
-		}
+		// if (!match.isOver) {
+		// 	var winner = match.players[match.players[0].socket.id !== socket.id ? 0 : 1];
+		// 	// endMatch(match, winner, "player left");
+		// } else {
+		// 	io.to(match.matchId).emit("no rematch");
+		// }
+		console.log(`REMOVING MATCH: ${match.matchId}`);
 		removeMatch(match);
 	}
 }
 
-function playerDisconnectedFromMatch (socket) {
+function playerDisconnected (socket) {
 	var player = findPlayerBySocketId(socket.id);
 	var index = players.indexOf(player);
 	if (index > -1) {
@@ -387,6 +397,10 @@ function removeMatch (match) {
 	var index = matches.indexOf(match);
 	if (index > -1) {
 		matches.splice(index, 1);
+	}
+	var index = lobbies.indexOf(match);
+	if (index > -1) {
+		lobbies.splice(index, 1);
 	}
 	updateMatchStatistics();
 }
