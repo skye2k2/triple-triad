@@ -1,5 +1,7 @@
 # Triple Triad
 
+![Version 0.1.0 Game Image](_extra/screenshots/v0.1.0-game.png)
+
 Based on a game that once existed in our universe. No ads, no cost, no third-party logins. Just games.
 
 Built with Node.js, Socket.io, and FabricJS.
@@ -19,16 +21,25 @@ Node server runs empty at < 20MB of RAM, with 11 threads.
 
 ## Copyright
 
-The game, its rules, characters, and artwork are all copyrighted by Square Enix. The game was designed by Hiroyuki Ito and released as a mini-game plus side quest in Final Fantasy VIII in 1999. The card images used in this adaptation originate from the Bandai CCG released the same year, unfortunately for many, only in Japan. The music is an adaptation of "Shuffle or Boogie", by [Simple Music](https://soundcloud.com/simple-music-4/final-fantasy-8-triple-triad-remix). The card back design was created by [Karen McCarthy](https://www.artstation.com/artwork/8YZbq) for another fan-made implementation of this game. Slimmed-down how-to-play content taken from [finalfantasy.fandom.com](https://finalfantasy.fandom.com/wiki/Triple_Triad_(Final_Fantasy_VIII)).
+The game, its rules, characters, and artwork are all copyrighted by Square Enix. The game was designed by Hiroyuki Ito and released as a mini-game-plus-side-quest in Final Fantasy VIII in 1999. The card images used in this adaptation originate from the Bandai CCG released the same year, unfortunately for many, only in Japan. The music is an adaptation of "Shuffle or Boogie", by [Simple Music](https://soundcloud.com/simple-music-4/final-fantasy-8-triple-triad-remix). The card back design was created by [Karen McCarthy](https://www.artstation.com/artwork/8YZbq) for another fan-made implementation of this game. Slimmed-down how-to-play content taken from [finalfantasy.fandom.com](https://finalfantasy.fandom.com/wiki/Triple_Triad_(Final_Fantasy_VIII)).
 
 ## Changelog:
 
-**0.1.0**
+**Version 0.1.0 - 2020-05-23 (initial functionality)**
 
-**Initial bits**
+![Version 0.1.0 Lobby Image](_extra/screenshots/v0.1.0-lobby.png)
+![Version 0.1.0 Game Image](_extra/screenshots/v0.1.0-game.png)
 
 - Socket.io implementation for game server, allowing multiple simultaneous matches
+- Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
+  - After the second player has joined, anyone else will be a spectator
+  - Allow spectators to connect to matches in progress (replay from game log)
+  - List matches in progress on home screen
+  - Play against bot opponent (basic intelligence)
+- Immediate rematch option given to both players upon match completion, with running score tracked, if yes
 - Drag'n'drop method of playing cards (placement limited to empty board spaces)
+- Server-side validation of all events and game logic, to limit hacking
+- Round ties broken by sudden death rematches where each player is dealt the cards they currently have control of
 - Opponent cards played move onto board and utilize a flip animation (flipped cards also animate)
 - Opponent cards displayed monochrome
 - HTTP resource compression & caching for a fast experience, while reducing server-side load
@@ -37,31 +48,32 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Server-side validation of cards & card placement, to keep things from being too easy for hackers
 - Sound effects for playing and flipping cards, and winning and losing the match
 - Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce in time to the music)
-- Immediate rematch option given to both players
-- Basic AI
-- Allow users to half-start a game (lobby), then send a code/URL to have their friend join them, jackbox-style
-  - After the second player has joined, anyone else will be a spectator
-  - Allow spectators to connect to matches in progress (replay from game log)
-  - List matches in progress on home screen
-  - Play against bot opponent
+
+<details>
+<summary>**Work-in-Progress Corner**</summary>
 
 #### TODO List:
 
 - HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
+- Add keyboard/controller support
+- Add all extended game rule options (Open, Chain, Plus)
+- Add minimal analytics (number of players/matches/final score)
 - Perfectly centered game board and title positioning
 - Add board background art
-- Allow users to choose names (maybe from a selection of FF VIII characters, to avoid vulgarity)
-- Add 30-second countdown timer per turn + autoplay functionality (initial logic for AI bots, just play the first card found that can capture an opponent's card, or the most defensive card available)
-- Add keyboard/controller support
 - Add effects for clicking rematch buttons, with indicator of if opponent wants a rematch
 - Add hover effect outline for target location when dragging card
-- Add all extended game rule options (Open, Chain, Plus)
 - Stress tester script, to see how many active games can run at a time, and limit games to that upper bound, to ensure a minimum performance level (https://stackoverflow.com/a/16426868/5334305)
-- See about adding to https://www.crazygames.com/c/io
+
+
+#### Idea Stack:
+
+- Allow users to choose names (maybe from a selection of FF VIII characters, to avoid vulgarity)
+- Add 30-second countdown timer per turn + autoplay functionality (initial logic for AI bots, just play the first card found that can capture an opponent's card, or the most defensive card available)
 - Allow page refresh without quitting match
-- Add minimal analytics (number of players/matches/final score)
 - Add fun Final Fantasy VIII facts to push to clients while waiting for a game
 - Track stats (plays/captures/losses per card and game mode)?
 - Permanently store game results (which would enable replays)
 - Dynamically create all card content (power numbers, name, border)
 - Add support and options for Final Fantasy XIV cards and modes
+
+</details>

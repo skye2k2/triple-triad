@@ -36,7 +36,7 @@ module.exports.listen = function (app) {
 	io = socketIO.listen(app);
 
 	io.on("connection", function (socket) {
-		console.log(`Player connected`);
+		// console.log(`Player connected`);
 		players.push({
 			socket: socket
 		});
@@ -63,11 +63,6 @@ module.exports.listen = function (app) {
 				socket.emit("enter match", Object.assign({}, { spectator: true, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: 'blue', opponentColor: 'red', log: match.log }));
 				socket.join(potentialMatchId);
 			}
-		} else {
-
-			// BEGIN TESTING ONLY: IMMEDIATELY START GAME
-			// enterQueue(socket);
-			// END TESTING ONLY
 		}
 
 		// TODO: Determine what triggers on a page refresh and add spectator cleanup to the list of things to do
@@ -340,7 +335,6 @@ function leaveMatch (socket) {
 		// } else {
 		// 	io.to(match.matchId).emit("no rematch");
 		// }
-		console.log(`REMOVING MATCH: ${match.matchId}`);
 		removeMatch(match);
 	}
 }
@@ -396,10 +390,12 @@ function rematchRequested (socket) {
 function removeMatch (match) {
 	var index = matches.indexOf(match);
 	if (index > -1) {
+		// console.log(`REMOVING MATCH: ${match.matchId}`);
 		matches.splice(index, 1);
 	}
 	var index = lobbies.indexOf(match);
 	if (index > -1) {
+		// console.log(`REMOVING LOBBY: ${match.matchId}`);
 		lobbies.splice(index, 1);
 	}
 	updateMatchStatistics();
