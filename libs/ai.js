@@ -10,17 +10,18 @@
  * Default: Play lowest card in a random available space
  */
 
+let gameplay = require("./gameplay");
 
-let cards = require("./cards");
 let debugMode = true;
 
 let ai = {
-	// The game manager needs access to the card list to generate matched decks, and the AI obviously needs access to the card stats to do analysis, so we load it here as the single source of truth
-	cardList: cards,
 
-	// Since we always need to indicate the card and the location, provide a standardized function for it
+	gameplay: gameplay,
+
+	// Since we always need to indicate the match, card, socket, and location, provide a standardized function for it
 	formatPlay: function (match, myIndex, cardIndex, location) {
 		return {
+			match, match,
 			socket: match.players[myIndex].socket,
 			cardIndex: cardIndex,
 			location: location
@@ -54,41 +55,52 @@ let ai = {
 			return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
 		}
 
-		let potentialMoves = {
-			highValue: [],
-			successful: [],
-			unsuccessful: []
-		};
-		let priorityTargets;
+		// TODO: If it is my last turn, and I did not start the round, play the better of my two remaining cards
+
 		let boardAnalysis = this.parseGameBoard(match, myIndex);
+		// We parse each set of priority targets individually, so save effort
+		let priorityTargets;
 
 		// console.log(boardAnalysis);
 
 		// If there is overlap between high-value attack and high-value defense spaces, play my best card
 		if (boardAnalysis.highValueAttackSpaces.length && boardAnalysis.highValueDefenseSpaces.length) {
-			priorityTargets = boardAnalysis.highValueAttackSpaces.filter(value => boardAnalysis.highValueDefenseSpaces.includes(value));
-			if (priorityTargets.length) {
-				this.log(`playing best card in an ultra high-value attackable/defendable space`, match, myIndex);
-				return this.formatPlay(match, myIndex, bestCardIndex, priorityTargets[0]);
+			priorityTargets = this.determineOverlap(boardAnalysis.highValueAttackSpaces, boardAnalysis.highValueDefenseSpaces);
+			if (priorityTargets) {
+				let attackMove = this.determineAttackMove(match, myIndex, priorityTargets);
+				this.log(`playing in an ultra high-value attackable/defendable space`, match, myIndex);
+				if (attackMove) {
+					return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
+				} else {
+					return this.formatPlay(match, myIndex, worstCardIndex, priorityTargets[0]);
+				}
 			}
 		}
 
-		// If there are high-value attackable spaces, play my best card
+		// Check high-value attackable spaces
 		if (boardAnalysis.highValueAttackSpaces.length) {
-			priorityTargets = boardAnalysis.highValueAttackSpaces.filter(value => boardAnalysis.defendableSpaces.includes(value));
-			if (priorityTargets.length) {
-				this.log(`playing best card in a doubly high-value attackable/defendable space`, match, myIndex);
-				return this.formatPlay(match, myIndex, bestCardIndex, priorityTargets[0]);
+			priorityTargets = this.determineOverlap(boardAnalysis.highValueAttackSpaces, boardAnalysis.defendableSpaces);
+			let attackMove;
+
+			if (priorityTargets) {
+				attackMove = this.determineAttackMove(match, myIndex, priorityTargets);
+				if (attackMove) {
+					this.log(`playing in a doubly high-value attackable/defendable space`, match, myIndex);
+					return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
+				}
 			} else {
-				this.log(`playing best card in a high-value attackable space`, match, myIndex);
-				return this.formatPlay(match, myIndex, bestCardIndex, this.pickRandomItem(boardAnalysis.highValueAttackSpaces));
+				attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.highValueAttackSpaces);
+				if (attackMove) {
+					this.log(`playing in a high-value attackable space`, match, myIndex);
+					return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
+				}
 			}
 		}
 
-		// If there are no high-value attackable spaces, play in a defensible position to keep cards I own
+		// If there are no high-value attackable spaces, play in a high-value defensible position to keep cards I own
 		if (boardAnalysis.highValueDefenseSpaces.length) {
-			priorityTargets = boardAnalysis.highValueDefenseSpaces.filter(value => boardAnalysis.attackableSpaces.includes(value));
-			if (priorityTargets.length) {
+			priorityTargets = this.determineOverlap(boardAnalysis.highValueDefenseSpaces, boardAnalysis.attackableSpaces);
+			if (priorityTargets) {
 				this.log(`playing worst card in a doubly high-value defendable/attackable space`, match, myIndex);
 				return this.formatPlay(match, myIndex, worstCardIndex, priorityTargets[0]);
 			} else {
@@ -97,24 +109,13 @@ let ai = {
 			}
 		}
 
-		// If there are standard attackable spaces, play my worst card to attack
+		// Check standard attackable spaces
 		if (boardAnalysis.attackableSpaces.length) {
-			// Try each card in hand, to see which result in a successful attack
-			// Then use the lowest-ranked option (future: that is reasonably safe)
-			// for (let i = 0; i < boardAnalysis.attackableSpaces.length; i++) {
-			// 	for (let j = 0; j < match.players[myIndex].cards.length; j++) {
-			// 		if (match.players[myIndex].cards[j])
-			// 		let captures = playCard(match.players[myIndex].socket, match.players[myIndex].cards[j], boardAnalysis.attackableSpaces[i], 'preview');
-			// 		if (captures.length > 1) {
-			// 			potentialMoves.highValue.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
-			// 		} else if (captures.length > 0) {
-			// 			potentialMoves.successful.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
-			// 		} else {
-			// 			potentialMoves.unsuccessful.push({cardIndex: j, location: boardAnalysis.attackableSpaces[i]});
-			// 		}
-			// 	}
-			// }
-			this.log(`playing worst card in a random attackable space`, match, myIndex);
+			let attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.attackableSpaces);
+			if (attackMove) {
+				this.log(`playing worst card in an attackable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
+			}
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.attackableSpaces));
 		}
 
@@ -131,6 +132,75 @@ let ai = {
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
 		} else {
 			this.log(`ERROR: no open spaces`, match, myIndex);
+		}
+	},
+
+	determineAttackMove: function (match, myIndex, attackableSpaces) {
+		let options = {
+			extremeValue: [],
+			highValue: [],
+			successful: [],
+			unsuccessful: []
+		};
+
+		// Try each card in hand, to see which plays result in a successful attack
+		for (let i = 0; i < attackableSpaces.length; i++) {
+			let space = attackableSpaces[i];
+			for (let j = 0; j < match.players[myIndex].cards.length; j++) {
+				let card = match.players[myIndex].cards[j];
+				// Check for card, since we use empty placeholders
+				if (card) {
+					let captures = this.gameplay.playCard(match, match.players[myIndex].socket, j, space, 'preview');
+					// TODO: Track the highest rank of captured card, to know which captures are better than others
+					let playDetail = {location: space, cardId: parseInt(card.id), cardIndex: j, captures: captures};
+					if (captures.length > 2) {
+						options.extremeValue.push(playDetail);
+					} else if (captures.length > 1) {
+						options.highValue.push(playDetail);
+					} else if (captures.length > 0) {
+						options.successful.push(playDetail);
+					} else {
+						options.unsuccessful.push(playDetail);
+					}
+				}
+			}
+		}
+
+		// console.log(options);
+
+		// Choose the lowest-ranked option (future: that is reasonably safe)
+
+		let bestOptionList;
+
+		if (options.extremeValue.length) {
+			bestOptionList = options.extremeValue;
+		} else if (options.highValue.length) {
+			bestOptionList = options.highValue;
+		} else if (options.successful.length) {
+			bestOptionList = options.successful;
+		} else {
+			this.log(`no successful attack moves possible`, match, myIndex);
+			return false;
+		}
+
+		let opponentInformation = this.parseOpponentInformationFromLog(match, myIndex);
+
+		let cheapestOption = bestOptionList.reduce((accumulator, currentOption) => {
+			if (!accumulator || currentOption.cardId < accumulator.cardId) {
+				accumulator = currentOption;
+			}
+			return accumulator;
+		});
+
+		return cheapestOption;
+	},
+
+	determineOverlap: function (arrayToFilter, arrayToFind) {
+		let arrayOverlap = arrayToFilter.filter((value) => { arrayToFind.includes(value); });
+		if (arrayOverlap.length) {
+			return arrayOverlap
+		} else {
+			return false;
 		}
 	},
 
@@ -273,21 +343,6 @@ let ai = {
 		return !boardIsOccupied;
 	},
 
-	// The probable highest attack value for each given rank
-	// (tiers 2 and 5 will have some surprises, due to exceptions)
-	cardValueMatrix: [
-		6,
-		6,
-		7,
-		7,
-		7,
-		8,
-		8,
-		9,
-		10,
-		10
-	]
-
 	// accepts either a coordinate string or a two-item coordinate array as the second parameter
 	// isBoardSpaceEmpty: function (match, coords) {
 	// 	if (typeof coords === 'string') {
@@ -302,12 +357,6 @@ let ai = {
 		// Needs to be more like 'roundScoreMargin', so that we can choose a strategy based on a value
 	// },
 
-	// determineOpponentsRemainingTiers: function (match, myIndex) {
-	// },
-
-	// determineOpponentsProbableHighestAttackValue: function (match, myIndex) {
-	// },
-
 	// determineOddsThatOpponentCanBeatCard: function (match, myIndex) {
 	// },
 
@@ -317,19 +366,67 @@ let ai = {
 	// determineBestOffensivePlay: function (match, myIndex) {
 		// Highest power card that I can take over and likely keep
 	// }
+
+	// The probable highest attack value for each given rank
+	// (tiers 2 and 5 will have some surprises, due to exceptions)
+	cardHighestValueMatrix: [
+		6,
+		6,
+		7,
+		7,
+		7,
+		8,
+		8,
+		9,
+		10,
+		10
+	],
+
+	// Keep track of the cards the opponent has played (non-omniscient card-counting)
+	parseOpponentInformationFromLog: function (match, myIndex) {
+		opponentIndex = (match.players.indexOf(myIndex) === 0) ? 1 : 0;
+		opponentColor = match.players[opponentIndex].color;
+		let opponentAvailableCardTiers = (match.roundNumber < 3) ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [6, 7, 8, 9, 10];
+
+		// TODO: Once a tiebreaker happens, all bets are off. Figure out a way around this
+		let currentTiebreakerRoundLogIndex = match.log.lastIndexOf(`Begin Round ${match.roundNumber} Tiebreaker`);
+
+		if (currentTiebreakerRoundLogIndex === -1) {
+			// Determine the first set of plays from the first round, by using roundNumber - 1
+			if (match.roundNumber === 2) {
+				opponentAvailableCardTiers = this.parseOpponentPlaysForRound(match.log, match.roundNumber - 1, opponentAvailableCardTiers, opponentColor);
+			}
+
+			opponentAvailableCardTiers = this.parseOpponentPlaysForRound(match.log, match.roundNumber, opponentAvailableCardTiers, opponentColor);
+
+			return {
+				availableCardTiers: opponentAvailableCardTiers,
+				probableHighestCardValue: this.cardHighestValueMatrix[opponentAvailableCardTiers[opponentAvailableCardTiers.length - 1] - 1]
+			};
+		} else {
+			return false;
+		}
+	},
+
+	// Given a specific round, determine the card tiers that have been played by an opponent.
+	parseOpponentPlaysForRound: function (log, roundNumber, availableTiers, opponentColor) {
+		let entryToStartFrom = log.indexOf(`Begin Round ${roundNumber}`);
+		for (let i = entryToStartFrom; i < log.length; i++) {
+			if (log[i].includes(`${opponentColor}:play`)) {
+				logBits = log[i].split(':');
+				// Calculate the tier of the played card
+				let tierNumber = Math.ceil(parseInt(logBits[4]) / 11);
+				// Remove the tier of the played card from the list of potential cards the opponent has remaining
+				availableTiers = availableTiers.filter((val) => {
+					return val !== tierNumber
+				});
+			} else if (log[i].includes(`Begin Round ${roundNumber} Tiebreaker`) || log[i].includes(`End Round ${roundNumber}`)) {
+				break;
+			}
+		};
+
+		return availableTiers;
+	}
 };
-
-
-
-// Round Scoring & Management functions that need to be accessible and have a preview mode (to keep from eventing out to players, etc.)
-
-// function calculateResult (match, coords, replay) {
-// }
-
-// function attack (match, coords, attackingDirection, replay) {
-// }
-
-// function playCard (socket, cardIndex, location, replay) {
-// }
 
 module.exports = ai;

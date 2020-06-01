@@ -32,7 +32,7 @@ if (process.env.PORT) {
 
 
 const http = require("http").Server(app);
-const io = require('./libs/game_manager').listen(http);  // Start Socket.io server and let game_manager handle those connections
+const io = require('./libs/socket_server').listen(http);  // Start Socket.io server and let socket_server handle those connections
 
 app.set('port', (process.env.PORT || 5000));  // Use either given port or 5000 as default
 
