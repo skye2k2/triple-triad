@@ -50,39 +50,34 @@ let ai = {
 		let worstCardIndex = this.determineMinMaxCard(match, myIndex, 'worst');
 		let attackMove;
 
-		// If I am playing the first card of the round, just play my lowest card in the center
+		// If I am playing the first card of the round, just play my lowest card, protecting its weak side
 		let occupiedBoardSpaces = this.countOccupiedBoardSpaces(match);
 		if (occupiedBoardSpaces === 0) {
 			let worstCard = match.players[myIndex].cards[worstCardIndex];
-			if (worstCard.tier > 1) {
-				let location;
-				let worstCardDetail = this.determineWeakSide(worstCard);
+			let location;
+			let worstCardWeaknessDetail = this.determineWeakSide(worstCard);
 
-				switch (worstCardDetail.direction) {
-					case 'north':
-						location = '1,2';
-						break;
-					case 'east':
-						location = '2,3';
-						break;
-					case 'south':
-						location = '3,2';
-						break;
-					case 'west':
-						location = '2,1';
-						break;
-					default:
-						location = '2,2';
-						break;
-				}
-				this.log(`board is empty--playing lowest card defensively along its weak edge`, match, myIndex);
-				return this.formatPlay(match, myIndex, worstCardIndex, location);
-			} else {
-				this.log(`board is empty--playing lowest card in the center`, match, myIndex);
-				return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
+			switch (worstCardWeaknessDetail.direction) {
+				case 'north':
+					location = '1,2';
+					break;
+				case 'east':
+					location = '2,3';
+					break;
+				case 'south':
+					location = '3,2';
+					break;
+				case 'west':
+					location = '2,1';
+					break;
+				default:
+					location = '2,2';
+					break;
 			}
+			this.log(`board is empty--playing lowest card defensively along its weak edge`, match, myIndex);
+			return this.formatPlay(match, myIndex, worstCardIndex, location);
 		} else if (occupiedBoardSpaces > 7) {
-			// If there are two or fewer board spaces left, play my best remaining card
+			// If there are two or fewer board spaces left, preselect my best remaining card for default plays
 			worstCardIndex = bestCardIndex;
 		}
 
@@ -149,12 +144,15 @@ let ai = {
 
 		// If there are no attackable spaces, play in a defensible position to keep cards I own
 		if (boardAnalysis.defendableSpaces.length) {
-			this.log(`playing card in a defendable space`, match, myIndex);
-			// TODO: Opt to cover lowest exposed side
-			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.defendableSpaces));
+			let mostVulnerableLocation = this.determineMostVulnerableLocation(match, boardAnalysis);
+			if (mostVulnerableLocation) {
+				this.log(`playing card to cover most vulnerable space`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, mostVulnerableLocation);
+			}
 		}
 
 		// If there are no appealing options, just play my lowest card in an available space
+		// TODO: Play defensively along the card's weak edge, similar to the above, but taking available spaces into account
 		// TODO: OR play a high-defense card in its power corner
 		if (boardAnalysis.openSpaces.length) {
 			this.log(`no good options--playing card in a random open space`, match, myIndex);
@@ -180,7 +178,7 @@ let ai = {
 				// Check for card, since we use empty placeholders
 				if (card) {
 					let captures = this.gameplay.playCard(match, match.players[myIndex].socket, j, space, 'preview');
-					exposedSides = this.determineExposedSides(boardAnalysis, space);
+					let exposedSides = this.determineExposedSides(boardAnalysis, space);
 
 					let playDetail = {location: space, cardId: parseInt(card.id), cardIndex: j, captures: captures, exposedSides: exposedSides};
 
@@ -214,8 +212,8 @@ let ai = {
 			return false;
 		}
 
-		let opponentInformation = this.parseOpponentInformationFromLog(match, myIndex);
-
+		// let opponentInformation = this.parseOpponentInformationFromLog(match, myIndex);
+		// check if the exposed power is above what the opponent could reasonably capture
 
 		let cheapestOption = bestOptionList.reduce((accumulator, currentOption) => {
 			if (!accumulator) {
@@ -226,9 +224,11 @@ let ai = {
 
 				// TODO: Compare the highest rank of captured cards, to know which captures are better than others
 
-				// Use the lowest-ranked card, unless it is less than 4 ranks below the next option and would expose a significantly lower power
+				// Use the lowest-ranked card, unless it would expose a significantly lower power
 				if (currentOption.cardId < accumulator.cardId ||
-					(currentOption.tier - accumulator.tier < 4 && currentOptionLowestExposedSide.power > accumulatorLowestExposedSide.power + 2)
+					// currentOption.tier - accumulator.tier < 4
+					// currentOptionLowestExposedSide.power > opponentInformation.probableHighestCardValue
+					currentOptionLowestExposedSide.power > accumulatorLowestExposedSide.power + 2
 				) {
 					accumulator = currentOption;
 				}
@@ -240,22 +240,104 @@ let ai = {
 	},
 
 	determineExposedSides: function (boardAnalysis, location) {
-		results = this.findLocationsToAttackFrom(boardAnalysis.openSpaces, location);
-		if (results.length) {
-			// console.log(results);
-			return results;
+		attackLocations = this.findLocationsToAttackFrom(boardAnalysis.openSpaces, location);
+		if (attackLocations.length) {
+			let exposedDirections = [];
+			let coords = location.split(',');
+			coords[0] = parseInt(coords[0]);
+			coords[1] = parseInt(coords[1]);
+			coords[0]--;
+			coords[1]--;
+
+			// for each result, interpret attacking locations into directions
+			for (let i = 0; i < attackLocations.length; i++) {
+				const attackCoords = this.locationToCoords(attackLocations[i]);
+
+				let attackDirection;
+
+				if (attackCoords[0] < coords[0]) {
+					attackDirection = 'north';
+				} else if (attackCoords[0] > coords[0]) {
+					attackDirection = 'south';
+				} else if (attackCoords[1] > coords[1]) {
+					attackDirection = 'east';
+				} else if (attackCoords[1] < coords[1]) {
+					attackDirection = 'west';
+				}
+
+				exposedDirections.push(attackDirection);
+			}
+			return exposedDirections;
 		} else {
 			return false;
 		}
 	},
 
+	determineMostVulnerableLocation: function (match, boardAnalysis) {
+		let lowestExposedDetailList = [];
+
+		for (let i = 0; i < boardAnalysis.ownedSpaces.length; i++) {
+			let location = boardAnalysis.ownedSpaces[i];
+			let coords = this.locationToCoords(location)
+			let card = match.board[coords[0]][coords[1]].card;
+			let exposedSides = this.determineExposedSides(boardAnalysis, location);
+			if (exposedSides) {
+				let lowestExposedSide = this.determineWeakSide(card, exposedSides);
+				lowestExposedDetailList.push({location: location, exposedSides: exposedSides, ...lowestExposedSide});
+			}
+		}
+
+		let lowestExposedCardDetail = lowestExposedDetailList.reduce((accumulator, currentOption) => {
+			if (!accumulator) {
+				accumulator = currentOption;
+			} else {
+				if (currentOption.power < accumulator.power) {
+					accumulator = currentOption;
+				}
+			}
+			return accumulator;
+		});
+
+
+		let coords = lowestExposedCardDetail.location.split(',');
+		coords[0] = parseInt(coords[0]);
+		coords[1] = parseInt(coords[1]);
+		switch (lowestExposedCardDetail.direction) {
+			case 'north':
+				coords[0]--;
+				break;
+			case 'east':
+				coords[1]++;
+				break;
+			case 'south':
+				coords[0]++;
+				break;
+			case 'west':
+				coords[1]--;
+				break;
+			default:
+				break;
+		}
+
+
+		return `${coords[0]},${coords[1]}`;
+	},
+
 	determineWeakSide: function (card, sidesToCheck) {
-		let sides = [
-			{direction: 'north', power: card.north},
-			{direction: 'east', power: card.east},
-			{direction: 'south', power: card.south},
-			{direction: 'west', power: card.west}
-		];
+		let sides = [];
+
+		if (sidesToCheck) {
+			for (let i = 0; i < sidesToCheck.length; i++) {
+				sides.push({direction: sidesToCheck[i], power: card[sidesToCheck[i]]});
+			}
+		} else {
+			sides = [
+				{direction: 'north', power: card.north},
+				{direction: 'east', power: card.east},
+				{direction: 'south', power: card.south},
+				{direction: 'west', power: card.west}
+			];
+		}
 
 		// TODO: If two adjacent sides tie for the weakest or are significantly weaker, send a combination, e.g. 'northwest'
 		let weakestSide = sides.reduce((accumulator, currentOption) => {
@@ -418,15 +500,14 @@ let ai = {
 		return occupiedBoardSpaces;
 	},
 
-	// accepts either a coordinate string or a two-item coordinate array as the second parameter
-	// isBoardSpaceEmpty: function (match, coords) {
-	// 	if (typeof coords === 'string') {
-	// 		coords = coords.split(',');
-	// 		coords[0]--;
-	// 		coords[1]--;
-	// 	}
-	// 	return match.board[coords[0]][coords[1]].card;
-	// },
+	locationToCoords: function (location) {
+		if (typeof location === 'string') {
+			coords = location.split(',');
+			coords[0]--;
+			coords[1]--;
+		}
+		return coords;
+	},
 
 	// iAmWinning: function (match, myIndex) {
 		// Needs to be more like 'roundScoreMargin', so that we can choose a strategy based on a value
