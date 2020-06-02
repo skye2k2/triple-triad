@@ -48,14 +48,43 @@ let ai = {
 
 		let bestCardIndex = this.determineMinMaxCard(match, myIndex, 'best');
 		let worstCardIndex = this.determineMinMaxCard(match, myIndex, 'worst');
+		let attackMove;
 
 		// If I am playing the first card of the round, just play my lowest card in the center
-		if (this.isBoardEmpty(match)) {
-			this.log(`board is empty--playing worst card in the center`, match, myIndex);
-			return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
-		}
+		let occupiedBoardSpaces = this.countOccupiedBoardSpaces(match);
+		if (occupiedBoardSpaces === 0) {
+			let worstCard = match.players[myIndex].cards[worstCardIndex];
+			if (worstCard.tier > 1) {
+				let location;
+				let worstCardDetail = this.determineWeakSide(worstCard);
 
-		// TODO: If it is my last turn, and I did not start the round, play the better of my two remaining cards
+				switch (worstCardDetail.direction) {
+					case 'north':
+						location = '1,2';
+						break;
+					case 'east':
+						location = '2,3';
+						break;
+					case 'south':
+						location = '3,2';
+						break;
+					case 'west':
+						location = '2,1';
+						break;
+					default:
+						location = '2,2';
+						break;
+				}
+				this.log(`board is empty--playing lowest card defensively along its weak edge`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, location);
+			} else {
+				this.log(`board is empty--playing lowest card in the center`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
+			}
+		} else if (occupiedBoardSpaces > 7) {
+			// If there are two or fewer board spaces left, play my best remaining card
+			worstCardIndex = bestCardIndex;
+		}
 
 		let boardAnalysis = this.parseGameBoard(match, myIndex);
 		// We parse each set of priority targets individually, so save effort
@@ -67,7 +96,7 @@ let ai = {
 		if (boardAnalysis.highValueAttackSpaces.length && boardAnalysis.highValueDefenseSpaces.length) {
 			priorityTargets = this.determineOverlap(boardAnalysis.highValueAttackSpaces, boardAnalysis.highValueDefenseSpaces);
 			if (priorityTargets) {
-				let attackMove = this.determineAttackMove(match, myIndex, priorityTargets);
+				attackMove = this.determineAttackMove(match, myIndex, priorityTargets, boardAnalysis);
 				this.log(`playing in an ultra high-value attackable/defendable space`, match, myIndex);
 				if (attackMove) {
 					return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
@@ -80,16 +109,16 @@ let ai = {
 		// Check high-value attackable spaces
 		if (boardAnalysis.highValueAttackSpaces.length) {
 			priorityTargets = this.determineOverlap(boardAnalysis.highValueAttackSpaces, boardAnalysis.defendableSpaces);
-			let attackMove;
+			attackMove;
 
 			if (priorityTargets) {
-				attackMove = this.determineAttackMove(match, myIndex, priorityTargets);
+				attackMove = this.determineAttackMove(match, myIndex, priorityTargets, boardAnalysis);
 				if (attackMove) {
 					this.log(`playing in a doubly high-value attackable/defendable space`, match, myIndex);
 					return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
 				}
 			} else {
-				attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.highValueAttackSpaces);
+				attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.highValueAttackSpaces, boardAnalysis);
 				if (attackMove) {
 					this.log(`playing in a high-value attackable space`, match, myIndex);
 					return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
@@ -101,41 +130,41 @@ let ai = {
 		if (boardAnalysis.highValueDefenseSpaces.length) {
 			priorityTargets = this.determineOverlap(boardAnalysis.highValueDefenseSpaces, boardAnalysis.attackableSpaces);
 			if (priorityTargets) {
-				this.log(`playing worst card in a doubly high-value defendable/attackable space`, match, myIndex);
+				this.log(`playing lowest card in a doubly high-value defendable/attackable space`, match, myIndex);
 				return this.formatPlay(match, myIndex, worstCardIndex, priorityTargets[0]);
 			} else {
-				this.log(`playing worst card in a high-value defendable space`, match, myIndex);
+				this.log(`playing lowest card in a high-value defendable space`, match, myIndex);
 				return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.highValueDefenseSpaces));
 			}
 		}
 
 		// Check standard attackable spaces
 		if (boardAnalysis.attackableSpaces.length) {
-			let attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.attackableSpaces);
+			attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.attackableSpaces, boardAnalysis);
 			if (attackMove) {
-				this.log(`playing worst card in an attackable space`, match, myIndex);
+				this.log(`playing in an attackable space`, match, myIndex);
 				return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
 			}
-			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.attackableSpaces));
 		}
 
 		// If there are no attackable spaces, play in a defensible position to keep cards I own
 		if (boardAnalysis.defendableSpaces.length) {
-			this.log(`playing worst card in a defendable space`, match, myIndex);
+			this.log(`playing card in a defendable space`, match, myIndex);
+			// TODO: Opt to cover lowest exposed side
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.defendableSpaces));
 		}
 
 		// If there are no appealing options, just play my lowest card in an available space
 		// TODO: OR play a high-defense card in its power corner
 		if (boardAnalysis.openSpaces.length) {
-			this.log(`no good options--playing worst card in a random open space`, match, myIndex);
+			this.log(`no good options--playing card in a random open space`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
 		} else {
 			this.log(`ERROR: no open spaces`, match, myIndex);
 		}
 	},
 
-	determineAttackMove: function (match, myIndex, attackableSpaces) {
+	determineAttackMove: function (match, myIndex, attackableSpaces, boardAnalysis) {
 		let options = {
 			extremeValue: [],
 			highValue: [],
@@ -151,8 +180,10 @@ let ai = {
 				// Check for card, since we use empty placeholders
 				if (card) {
 					let captures = this.gameplay.playCard(match, match.players[myIndex].socket, j, space, 'preview');
-					// TODO: Track the highest rank of captured card, to know which captures are better than others
-					let playDetail = {location: space, cardId: parseInt(card.id), cardIndex: j, captures: captures};
+					exposedSides = this.determineExposedSides(boardAnalysis, space);
+
+					let playDetail = {location: space, cardId: parseInt(card.id), cardIndex: j, captures: captures, exposedSides: exposedSides};
+
 					if (captures.length > 2) {
 						options.extremeValue.push(playDetail);
 					} else if (captures.length > 1) {
@@ -168,7 +199,7 @@ let ai = {
 
 		// console.log(options);
 
-		// Choose the lowest-ranked option (future: that is reasonably safe)
+		// Choose the lowest-ranked option that gets the job done
 
 		let bestOptionList;
 
@@ -179,20 +210,62 @@ let ai = {
 		} else if (options.successful.length) {
 			bestOptionList = options.successful;
 		} else {
-			this.log(`no successful attack moves possible`, match, myIndex);
+			// this.log(`no successful attack moves possible`, match, myIndex);
 			return false;
 		}
 
 		let opponentInformation = this.parseOpponentInformationFromLog(match, myIndex);
 
+
 		let cheapestOption = bestOptionList.reduce((accumulator, currentOption) => {
-			if (!accumulator || currentOption.cardId < accumulator.cardId) {
+			if (!accumulator) {
 				accumulator = currentOption;
+			} else {
+				currentOptionLowestExposedSide = this.determineWeakSide(match.players[myIndex].cards[currentOption.cardIndex], currentOption.exposedSides);
+				accumulatorLowestExposedSide = this.determineWeakSide(match.players[myIndex].cards[accumulator.cardIndex], accumulator.exposedSides);
+
+				// TODO: Compare the highest rank of captured cards, to know which captures are better than others
+
+				// Use the lowest-ranked card, unless it is less than 4 ranks below the next option and would expose a significantly lower power
+				if (currentOption.cardId < accumulator.cardId ||
+					(currentOption.tier - accumulator.tier < 4 && currentOptionLowestExposedSide.power > accumulatorLowestExposedSide.power + 2)
+				) {
+					accumulator = currentOption;
+				}
 			}
 			return accumulator;
 		});
 
 		return cheapestOption;
+	},
+
+	determineExposedSides: function (boardAnalysis, location) {
+		results = this.findLocationsToAttackFrom(boardAnalysis.openSpaces, location);
+		if (results.length) {
+			// console.log(results);
+			return results;
+		} else {
+			return false;
+		}
+	},
+
+	determineWeakSide: function (card, sidesToCheck) {
+		let sides = [
+			{direction: 'north', power: card.north},
+			{direction: 'east', power: card.east},
+			{direction: 'south', power: card.south},
+			{direction: 'west', power: card.west}
+		];
+
+		// TODO: If two adjacent sides tie for the weakest or are significantly weaker, send a combination, e.g. 'northwest'
+		let weakestSide = sides.reduce((accumulator, currentOption) => {
+			if (!accumulator || currentOption.power < accumulator.power) {
+				accumulator = currentOption;
+			}
+			return accumulator;
+		});
+
+		return weakestSide;
 	},
 
 	determineOverlap: function (arrayToFilter, arrayToFind) {
@@ -328,19 +401,21 @@ let ai = {
 			return accumulator;
 		}, initialAccumulatorIndex);
 
-		// this.log(`worst card determined to be: id=${minMaxCardIndex} (${cards[minMaxCardIndex].name})`, match, myIndex);
+		// this.log(`lowest card determined to be: id=${minMaxCardIndex} (${cards[minMaxCardIndex].name})`, match, myIndex);
 		return minMaxCardIndex;
 	},
 
 	// Return if the board is empty (and we obviously shouldn't run extra logic to determine where to play)
-	isBoardEmpty: function (match) {
-		// Loop through board see if there have been cards played
-		let boardIsOccupied = match.board.some((row) => {return row.some((space) => {
-			return (space.card)
+	countOccupiedBoardSpaces: function (match) {
+		occupiedBoardSpaces = 0;
+		// Loop through board and count the occupied spaces
+		match.board.map((row) => {return row.map((space) => {
+			if (space.card) {
+				occupiedBoardSpaces++;
+			}
 		});});
 
-		// this.log(`board is ${(boardIsOccupied) ? 'not ': ''}empty`, match, myIndex);
-		return !boardIsOccupied;
+		return occupiedBoardSpaces;
 	},
 
 	// accepts either a coordinate string or a two-item coordinate array as the second parameter
