@@ -780,6 +780,8 @@ function renderScoreStoplight () {
 		}
 	}
 
+	// TODO: Display Match ID underneath stoplight
+
 	renderPlayerRunningScore(playerRunningScore);
 	renderPlayerRunningScore(opponentRunningScore, true);
 

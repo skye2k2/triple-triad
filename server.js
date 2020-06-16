@@ -22,7 +22,7 @@ if (process.env.PORT) {
 		etag: false,
 		immutable: true, // NOTE: This makes it so that no query is even sent to the server for matched requests, if there is a cached version.
 		lastModified: false,
-		maxAge: 86400000 * 30
+		maxAge: 86400000 * 1 // 86400000 milliseconds in one day
 	})); // Serve pages static-ly, using directory 'public' as root
 } else {
 	app.use(express.static(path.join(__dirname, 'public'), {
@@ -54,8 +54,9 @@ app.get( '^/:matchId([ACDEFGHJKLMNPRTUWXY3679]{4})', (req, res) => {
 
 // 404 catch-all for routes not matched
 app.get("*", (req, res) => {
-	// TODO: Just send them back to the lobby, and show a note that the match could not be found
-	res.status(404).send("Error 404 - Game not found");
+	// Send bad requests back to the lobby
+	res.redirect(301, `/`);
+	// res.status(404).send("Error 404 - Game not found");
 });
 
 // Start http server

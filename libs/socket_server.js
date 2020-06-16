@@ -222,7 +222,7 @@ function createMatch (participants, lobby) {
 		};
 		match.players.push(playerObject);
 		// TODO: CLEANUP: Just have a single state object that contains all of the round and match information to send to the clients, or a function that assembles the data on-the-fly, to keep duplication down
-		participants[i].socket.emit("enter match", Object.assign({}, { roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red' }));
+		participants[i].socket.emit("enter match", Object.assign({}, { matchId: match.matchId, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red', solo: match.solo }));
 
 		participants[i].socket.join(match.matchId);
 	}

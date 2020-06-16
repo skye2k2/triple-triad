@@ -5,14 +5,15 @@ let socket = io();
 let ANIMATION_TIME = 600;
 let animationTimeout;
 let canPlayCard = false;
-let debugMode = true;
+let debugMode = false;
 let gameEventQueue = [];
 let log;
-let playerColor = "";
+let matchId = '';
+let playerColor = '';
 let playerRoundScore = 0;
 let playerRoundStrength = 5;
 let playerRunningScore;
-let opponentColor = "";
+let opponentColor = '';
 let opponentRoundScore = 0;
 let opponentRoundStrength = 5;
 let opponentRunningScore;
@@ -34,6 +35,7 @@ socket.on("draw hand", function (cards) {
 	// If we are in replay mode, keep from starting a new round until the current round is complete
 	if (gameEventQueue.length === 0) {
 		// TODO: Add a way of acknowledging the previous round before starting the next one
+		// The reason this different handling is needed is because of the isRenderComplete check that makes sure that cards are rendered before processing the event queue. TODO: Fix this.
 		setTimeout(() => {
 			startRound(cards);
 		}, ANIMATION_TIME);
@@ -79,10 +81,6 @@ socket.on("enable hand", function (activePlayer) {
 	}
 });
 
-socket.on("fight result", function (result) {
-	displayResult(result);
-});
-
 socket.on("replay match", function (matchDetail) {
 	// TODO: Implement. Loop through match log, and queue up events
 });
@@ -125,7 +123,6 @@ function setState (state) {
 function enterLobby (matchId) {
 	// console.log(`${document.location.href}${matchId}`);
 	document.querySelector('.game-link').innerHTML = `${document.location.href}${matchId}`;
-	matchId = matchId;
 	setState('inlobby');
 }
 
@@ -133,6 +130,8 @@ function enterMatch (matchDetail) {
 	// debugMode && console.log(`enterMatch`, matchDetail);
 	setState('ingame');
 
+	matchId = matchDetail.matchId;
+	solo = matchDetail.solo;
 	spectator = matchDetail.spectator;
 
 	playerColor = matchDetail.playerColor;
@@ -164,6 +163,7 @@ function rematch (evt) {
 	if (evt.detail === 'yes') {
 		// TODO: Add Analytics conversion event
 		socket.emit("request rematch");
+		trackEvent('Match', 'Request Rematch', `${playerRunningScore} - ${opponentRunningScore}`);
 	} else {
 		socket.emit("leave match");
 		// TODO: Set state/show button to return to lobby
@@ -189,7 +189,7 @@ function gameEvent () {
 				eventDetail = gameEventQueue.shift();
 				switch (eventDetail.type) {
 					case 'move':
-						debugMode && console.log(`play card:${eventDetail.location}, ${eventDetail.cardImageId} ${(eventDetail.mine) ? '(mine)' : ''}`);
+						debugMode && console.log(`play card: ${eventDetail.location}, ${eventDetail.cardImageId} ${(eventDetail.mine) ? '(mine)' : ''}`);
 						moveCard(eventDetail);
 						break;
 					case 'flip':
@@ -255,7 +255,7 @@ function generateReplayFromLog (matchDetail) {
 					gameEventQueue.push({type: 'move', location: logBits[2], cardIndexInHand: logBits[3],  color: logBits[0], cardImageId: logBits[4], spectator: (logBits[0].includes(playerColor)) ? true : false});
 					break;
 				case 'capture':
-					// TODO: Either add the update score to the log, or always calculate it
+					// TODO: Either add the end round to the log, or always calculate it
 					if (logBits[0].includes('blue')) { // When spectating, assume the player is blue
 						playerRoundStrength++;
 						opponentRoundStrength--;
@@ -319,7 +319,7 @@ function updatePlayerStrengthValues (matchDetail) {
 	renderPlayerScore(matchDetail.roundStrength[opponentColor], true);
 }
 
-function updateScores (matchDetail) {
+function updateScores (matchDetail, isForMatch) {
 	// debugMode && console.log(`updateScores: ${JSON.stringify(matchDetail)}`);
 	playerRoundScore = matchDetail.scoreboard[playerColor] || 0;
 	opponentRoundScore = matchDetail.scoreboard[opponentColor] || 0;
@@ -328,33 +328,71 @@ function updateScores (matchDetail) {
 		opponentRunningScore = matchDetail.runningScore[opponentColor] || 0;
 	}
 	renderScoreStoplight();
+
+	// TODO: BUG: This check keeps us from running on the initial deal, but also keeps us from running on tiebreakers. What we could do is have an additional event that is fired to animate everyone's cards back into their hands, which would also trigger this.
+	if (matchDetail.scoreboard.red || matchDetail.scoreboard.blue || matchDetail.runningScore.red || matchDetail.runningScore.blue) {
+		calculateWinnerAndLoserDetail(matchDetail, isForMatch);
+	}
+}
+
+// Do the calculations required to determine winner/loser status, and fire appropriate events
+function calculateWinnerAndLoserDetail (matchDetail, isForMatch) {
+	let scoreLocation = (isForMatch) ? matchDetail.scoreboard : matchDetail.roundStrength;
+	let eventCategory = (isForMatch) ? 'Match' : 'Round';
+
+	let winnerColor = (scoreLocation && scoreLocation.red > scoreLocation.blue) ? 'red' : 'blue';
+	let loserColor = (scoreLocation && scoreLocation.red > scoreLocation.blue) ? 'blue' : 'red';
+	let score = '';
+	let result = '';
+
+	if (!spectator) {
+		if (scoreLocation) {
+			if (scoreLocation.red === scoreLocation.blue) {
+				result = 'Tie';
+				score = `${scoreLocation.red} - ${scoreLocation.blue}`;
+			} else
+			if (playerColor === winnerColor) {
+				result = 'Win';
+				score = `${scoreLocation[winnerColor]} - ${scoreLocation[loserColor]}`;
+				if (isForMatch) {
+					playSound(fanfare);
+				}
+			} else {
+				result = 'Lose';
+				score = `${scoreLocation[loserColor]} - ${scoreLocation[winnerColor]}`;
+				if (isForMatch) {
+					playSound(loser);
+				}
+			}
+		}
+
+		if (isForMatch) {
+			renderRematchBlock();
+		}
+	} else {
+		result = 'Spectate'
+		// TODO: Use game status notifications, instead of alerts
+		if (isForMatch) {
+			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+		}
+	}
+
+	if (scoreLocation) {
+		trackEvent(eventCategory, result, score);
+	}
 }
 
 function endMatch (matchDetail) {
-	updateScores(matchDetail);
 
 	log = matchDetail.log;
 	console.log(log);
 
-	let winnerColor = (matchDetail.scoreboard.red > matchDetail.scoreboard.blue) ? 'red' : 'blue';
-	let loserColor = (matchDetail.scoreboard.red > matchDetail.scoreboard.blue) ? 'blue' : 'red';
-
 	// Wait for any processing animations to complete
 	setTimeout(() => {
+		updateScores(matchDetail, true);
+
 		enableCards(true);
-		// TODO: Use game status notifications, instead of alerts
-		if (!spectator) {
-			if (playerColor === winnerColor) {
-				playSound(fanfare);
-				// alert(`You win! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
-			} else if (playerColor === loserColor) {
-				playSound(loser);
-				// alert(`You lose. (${matchDetail.scoreboard[loserColor]} - ${matchDetail.scoreboard[winnerColor]})`);
-			}
-			renderRematchBlock();
-		} else {
-			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
-		}
+
 	}, ANIMATION_TIME * 2);
 
 	// if (matchEndReason === "player left") {
@@ -367,10 +405,19 @@ function endMatch (matchDetail) {
 	// }
 }
 
-// TODO: DELETE THESE, ONCE GAME STATE IS STABLE
-function exitMatch () {
-	if (debugMode) console.log("%s(%s)", arguments.callee.name, Array.prototype.slice.call(arguments).sort());
-	playerRoundStrength = 0;
-	opponentRoundStrength = 5;
-	socket.emit("leave match");
+function trackEvent (category, action, label) {
+	if (solo) {
+		category = `${category} (solo)`
+	}
+
+	if (typeof ga !== 'undefined') {
+		ga('send', {
+			hitType: 'event',
+			eventCategory: category,
+			eventAction: action,
+			eventLabel: label
+		});
+	} else {
+		debugMode && console.log(`ANALYTICS EVENT:`, category, action, label);
+	}
 }

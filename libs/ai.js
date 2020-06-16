@@ -1,12 +1,14 @@
 // This file handles all AI-related game functions
-// NOTE: Yes, we could have a significantly more intelligent AI if we tracked state across turns, but this would dramatically increase server load and overhead. Consider using the event log, for now, to determine who played what cards, and thus, the odds of the strength of remaining cards.
+// NOTE: Yes, we could have a significantly more intelligent AI if we tracked state across turns, but this would dramatically increase server load and overhead. Basic AI parses the event log to determine who played what cards in previous rounds, and thus, either the opponent's remaining cards or card tiers. This is a non-cheating algorithm.
 
 /**
  * "BASIC" AI LOGIC:
- * If I am playing the first card of the round, just play my lowest card in the center
+ * If I am playing the first card of the round, just play my lowest card defensively along its weak edge
  * Find all open board locations
- * Find and try high-impact locations (where the location borders more than one opponent-owned card)
- * Find and try attackable single cards
+ * Check high-impact attack locations (where the location borders more than one opponent-owned card)
+ * Check for high-impact defensive locations (where the location borders more than one owned card)
+ * Check attackable single cards
+ * Check for single card defensible locations
  * Default: Play lowest card in a random available space
  */
 
@@ -40,7 +42,7 @@ let ai = {
 		}
 	},
 
-	// Primary logic
+	// Primary logic tree
 	play: function (match, myIndex) {
 		if (typeof myIndex === 'object') {
 			myIndex = match.players.indexOf(myIndex);
@@ -58,14 +60,26 @@ let ai = {
 			let worstCardWeaknessDetail = this.determineWeakSide(worstCard);
 
 			switch (worstCardWeaknessDetail.direction) {
+				case 'northwest':
+					location = '1,1';
+					break;
 				case 'north':
 					location = '1,2';
+					break;
+				case 'northeast':
+					location = '1,3';
 					break;
 				case 'east':
 					location = '2,3';
 					break;
+				case 'southeast':
+					location = '3,3';
+					break;
 				case 'south':
 					location = '3,2';
+					break;
+				case 'southwest':
+					location = '3,1';
 					break;
 				case 'west':
 					location = '2,1';
@@ -76,13 +90,13 @@ let ai = {
 			}
 			this.log(`board is empty--playing lowest card defensively along its weak edge`, match, myIndex);
 			return this.formatPlay(match, myIndex, worstCardIndex, location);
-		} else if (occupiedBoardSpaces > 7) {
+		} else if (occupiedBoardSpaces >= 7) {
 			// If there are two or fewer board spaces left, preselect my best remaining card for default plays
 			worstCardIndex = bestCardIndex;
 		}
 
 		let boardAnalysis = this.parseGameBoard(match, myIndex);
-		// We parse each set of priority targets individually, so save effort
+		// We parse each set of priority targets individually, to save effort
 		let priorityTargets;
 
 		// console.log(boardAnalysis);
@@ -212,8 +226,17 @@ let ai = {
 			return false;
 		}
 
-		// let opponentInformation = this.parseOpponentInformationFromLog(match, myIndex);
-		// check if the exposed power is above what the opponent could reasonably capture
+		// let intelligence = this.parseInformationFromLog(match, myIndex);
+
+		// TODO: Check if the exposed power is above what the opponent could reasonably capture
+		// console.log(`-----------`);
+		// if (intelligence.opponentHand) {
+		// 	console.log(intelligence.opponentHand);
+		// } else {
+		// 	console.log(opponentAvailableCardTiers);
+		// 	console.log(opponentHighestCardValue);
+		// }
+		// console.log(`-----------`);
 
 		let cheapestOption = bestOptionList.reduce((accumulator, currentOption) => {
 			if (!accumulator) {
@@ -539,49 +562,80 @@ let ai = {
 	],
 
 	// Keep track of the cards the opponent has played (non-omniscient card-counting)
-	parseOpponentInformationFromLog: function (match, myIndex) {
+	parseInformationFromLog: function (match, myIndex) {
 		opponentIndex = (match.players.indexOf(myIndex) === 0) ? 1 : 0;
 		opponentColor = match.players[opponentIndex].color;
 		let opponentAvailableCardTiers = (match.roundNumber < 3) ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [6, 7, 8, 9, 10];
 
-		// TODO: Once a tiebreaker happens, all bets are off. Figure out a way around this
+		// Once a tiebreaker happens, we can't count based on tiers--but we can determine at least four of the opponent's cards
 		let currentTiebreakerRoundLogIndex = match.log.lastIndexOf(`Begin Round ${match.roundNumber} Tiebreaker`);
 
 		if (currentTiebreakerRoundLogIndex === -1) {
-			// Determine the first set of plays from the first round, by using roundNumber - 1
+			// Determine the card tiers played from the first round, by using roundNumber - 1
 			if (match.roundNumber === 2) {
-				opponentAvailableCardTiers = this.parseOpponentPlaysForRound(match.log, match.roundNumber - 1, opponentAvailableCardTiers, opponentColor);
+				opponentAvailableCardTiers = this.parsePlaysForRound(match.log, match.roundNumber - 1, opponentAvailableCardTiers, opponentColor).opponentAvailableTiers;
 			}
 
-			opponentAvailableCardTiers = this.parseOpponentPlaysForRound(match.log, match.roundNumber, opponentAvailableCardTiers, opponentColor);
+			opponentAvailableCardTiers = this.parsePlaysForRound(match.log, match.roundNumber, opponentAvailableCardTiers, opponentColor).opponentAvailableTiers;
 
 			return {
-				availableCardTiers: opponentAvailableCardTiers,
-				probableHighestCardValue: this.cardHighestValueMatrix[opponentAvailableCardTiers[opponentAvailableCardTiers.length - 1] - 1]
+				opponentAvailableCardTiers: opponentAvailableCardTiers,
+				opponentHighestCardValue: this.cardHighestValueMatrix[opponentAvailableCardTiers[opponentAvailableCardTiers.length - 1] - 1]
 			};
 		} else {
-			return false;
+			// Parse the played cards from the current round
+			currentRoundDetail = this.parsePlaysForRound(match.log, match.roundNumber, opponentAvailableCardTiers, 'any', currentTiebreakerRoundLogIndex);
+
+			// Parse the played cards from the round before tiebreaker
+			pastRoundDetail = this.parsePlaysForRound(match.log, match.roundNumber, opponentAvailableCardTiers, 'any');
+
+			// Remove the cards that we own
+			let knownCards = pastRoundDetail.availableCards.filter((card) => {
+				return !match.players[myIndex].cards.includes(card);
+			});
+
+			// Remove the cards that both players have played thus far this round
+			knownCards = knownCards.filter((card) => {
+				return !currentRoundDetail.playedCardIds.includes(card.id.toString());
+			});
+
+			return {
+				// opponentAvailableCardTiers/opponentHighestCardValue, // We are not including this information, at this point, because the actual cards are much more precise than tier-based probabilities
+				opponentHand: knownCards
+			};
 		}
 	},
 
-	// Given a specific round, determine the card tiers that have been played by an opponent.
-	parseOpponentPlaysForRound: function (log, roundNumber, availableTiers, opponentColor) {
-		let entryToStartFrom = log.indexOf(`Begin Round ${roundNumber}`);
-		for (let i = entryToStartFrom; i < log.length; i++) {
-			if (log[i].includes(`${opponentColor}:play`)) {
+	// Given a specific round, determine the card tiers remaining for an opponent, or, if a tiebreaker round, also return the entire previously-played set of cards.
+	parsePlaysForRound: function (log, roundNumber, availableTiers, opponentColor, entryToStartFrom) {
+		entryToStartFrom = entryToStartFrom || log.indexOf(`Begin Round ${roundNumber}`);
+		let availableCardList = [];
+		let playedCardIds = [];
+		for (let i = entryToStartFrom + 1; i < log.length; i++) {
+			if (log[i].includes(`:play`)) {
 				logBits = log[i].split(':');
-				// Calculate the tier of the played card
-				let tierNumber = Math.ceil(parseInt(logBits[4]) / 11);
-				// Remove the tier of the played card from the list of potential cards the opponent has remaining
-				availableTiers = availableTiers.filter((val) => {
-					return val !== tierNumber
-				});
+
+				// Calculate the tier of the played card, base on the id
+				let cardId = parseInt(logBits[4]);
+				let cardTierNumber = Math.ceil(cardId / 11);
+
+				playedCardIds.push(logBits[4]);
+
+				if (opponentColor !== 'any' && log[i].includes(opponentColor)) {
+					// Remove the tier of the played card from the list of potential cards the opponent has remaining
+					availableTiers = availableTiers.filter((val) => {
+						return val !== cardTierNumber
+					});
+				} else {
+					// Add the information of all played cards to the known list for the round
+					availableCardList.push(this.gameplay.cardList[`tier${cardTierNumber}`][(cardId - 1) % 11]);
+				}
 			} else if (log[i].includes(`Begin Round ${roundNumber} Tiebreaker`) || log[i].includes(`End Round ${roundNumber}`)) {
 				break;
 			}
 		};
 
-		return availableTiers;
+		return { opponentAvailableTiers: availableTiers, availableCards: availableCardList, playedCardIds: playedCardIds};
 	}
 };
 

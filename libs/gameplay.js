@@ -224,12 +224,12 @@ let gameplay = {
 			if (match.rules === "BASIC") {
 				if (defendingLocation.card && attackingLocation.card[attackingDirection] > defendingLocation.card[defendingDirection]) {
 					if (playMode === 'preview') {
-						return `${attackingLocation.color}:capture:${defendingLocationString}:${defendingLocation.card.name} (${attackingDirection})`;
+						return `${attackingLocation.color}:capture:${defendingLocationString}:${defendingLocation.card.id}:${defendingLocation.card.name} (${attackingDirection})`;
 					} else {
 						match.roundStrength[attackingLocation.color]++;
 						match.roundStrength[defendingLocation.color]--;
 						defendingLocation.color = attackingLocation.color;
-						this.log(`${attackingLocation.color}:capture:${defendingLocationString}:${defendingLocation.card.name} (${attackingDirection})`, match);
+						this.log(`${attackingLocation.color}:capture:${defendingLocationString}:${defendingLocation.card.id}:${defendingLocation.card.name} (${attackingDirection})`, match);
 						io.to(match.matchId).emit("card flipped", {location: defendingLocationString, matchDetail: { roundStrength: match.roundStrength}});
 					}
 				}
@@ -243,7 +243,6 @@ let gameplay = {
 	 * @description - After a card is played, determine its effect on the board, and if the board is now full, determine the round winner.
 	 * @returns {undefined} - Modifies match data directly.
 	 */
-	// TODO: ADD PREVIEW MODE, AND RETURN THE CHANGES, INSTEAD OF MODIFYING DIRECTLY
 	calculateResult: function (match, coords, playMode) {
 		let results = [];
 		results.push(this.attack(match, coords, 'north', playMode));
@@ -303,7 +302,7 @@ let gameplay = {
 		let redTotalScore = match.scoreboard.red;
 		let blueTotalScore = match.scoreboard.blue;
 
-		io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard, runningScore: match.runningScore});
+		io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard, roundStrength: match.roundStrength, runningScore: match.runningScore});
 
 		// Check if game is over, otherwise start the next round
 		if (redTotalScore === 2) {
