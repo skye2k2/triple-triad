@@ -161,7 +161,6 @@ function rematch (evt) {
 	debugMode && console.log("event:rematch", evt.detail);
 
 	if (evt.detail === 'yes') {
-		// TODO: Add Analytics conversion event
 		socket.emit("request rematch");
 		trackEvent('Match', 'Request Rematch', `${playerRunningScore} - ${opponentRunningScore}`);
 	} else {

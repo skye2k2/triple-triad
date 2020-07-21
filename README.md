@@ -29,7 +29,9 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 <summary>Version 0.1.1 - 2020-06-16</summary>
 
 - AI improved to always make an immediately beneficial move. Multiple attack or defense positions are prioritized above all else.
+
 </details>
+
 - Analytics for completed rounds and matches
 
 <summary>Version 0.1.0 - 2020-05-23 (initial functionality)</summary>
@@ -65,6 +67,8 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Gracefully handle double-clicking of rematch button
 - HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
 - Add keyboard/controller support
+- Add "hint", for easy mode, that runs the AI function to determine the best move, and highlights the suggested card and location to play it
+- Figure out why favicon is requested for each card move
 - Add all extended game rule options (Open, Chain, Plus)
 - Add minimal stats to main lobby (number of players/matches/final score)
 - Perfectly centered game board and title positioning
