@@ -32,7 +32,7 @@ let ai = {
 
 	// Prefix and log messages, as necessary
 	log: function (logString, match, myIndex) {
-		logString = ` - ${match.players[myIndex].color} AI: ${logString}`;
+		logString = ` - ${match.players[myIndex].color} AI${(match.difficulty) ? ' (' + match.difficulty + ')' : ''}: ${logString}`;
 
 		// if (match) {
 		// 	match.log.push(logString);
@@ -47,6 +47,7 @@ let ai = {
 		if (typeof myIndex === 'object') {
 			myIndex = match.players.indexOf(myIndex);
 		}
+		let EASY_MODE = (match.difficulty !== 'HARD') ? true : false;
 
 		let bestCardIndex = this.determineMinMaxCard(match, myIndex, 'best');
 		let worstCardIndex = this.determineMinMaxCard(match, myIndex, 'worst');
@@ -57,6 +58,12 @@ let ai = {
 		if (occupiedBoardSpaces === 0) {
 			let worstCard = match.players[myIndex].cards[worstCardIndex];
 			let location;
+
+			if (EASY_MODE) {
+				this.log(`board is empty--playing lowest card in the middle`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, '2,2');
+			}
+
 			let worstCardWeaknessDetail = this.determineWeakSide(worstCard);
 
 			switch (worstCardWeaknessDetail.direction) {
@@ -102,7 +109,7 @@ let ai = {
 		// console.log(boardAnalysis);
 
 		// If there is overlap between high-value attack and high-value defense spaces, play my best card
-		if (boardAnalysis.highValueAttackSpaces.length && boardAnalysis.highValueDefenseSpaces.length) {
+		if (!EASY_MODE && boardAnalysis.highValueAttackSpaces.length && boardAnalysis.highValueDefenseSpaces.length) {
 			priorityTargets = this.determineOverlap(boardAnalysis.highValueAttackSpaces, boardAnalysis.highValueDefenseSpaces);
 			if (priorityTargets) {
 				attackMove = this.determineAttackMove(match, myIndex, priorityTargets, boardAnalysis);
@@ -116,7 +123,7 @@ let ai = {
 		}
 
 		// Check high-value attackable spaces
-		if (boardAnalysis.highValueAttackSpaces.length) {
+		if (!EASY_MODE && boardAnalysis.highValueAttackSpaces.length) {
 			priorityTargets = this.determineOverlap(boardAnalysis.highValueAttackSpaces, boardAnalysis.defendableSpaces);
 			attackMove;
 
@@ -136,7 +143,7 @@ let ai = {
 		}
 
 		// If there are no high-value attackable spaces, play in a high-value defensible position to keep cards I own
-		if (boardAnalysis.highValueDefenseSpaces.length) {
+		if (!EASY_MODE && boardAnalysis.highValueDefenseSpaces.length) {
 			priorityTargets = this.determineOverlap(boardAnalysis.highValueDefenseSpaces, boardAnalysis.attackableSpaces);
 			if (priorityTargets) {
 				this.log(`playing lowest card in a doubly high-value defendable/attackable space`, match, myIndex);
@@ -149,7 +156,7 @@ let ai = {
 
 		// Check standard attackable spaces
 		if (boardAnalysis.attackableSpaces.length) {
-			attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.attackableSpaces, boardAnalysis);
+			attackMove = this.determineAttackMove(match, myIndex, boardAnalysis.attackableSpaces, boardAnalysis, EASY_MODE);
 			if (attackMove) {
 				this.log(`playing in an attackable space`, match, myIndex);
 				return this.formatPlay(match, myIndex, attackMove.cardIndex, attackMove.location);
@@ -176,7 +183,7 @@ let ai = {
 		}
 	},
 
-	determineAttackMove: function (match, myIndex, attackableSpaces, boardAnalysis) {
+	determineAttackMove: function (match, myIndex, attackableSpaces, boardAnalysis, EASY_MODE) {
 		let options = {
 			extremeValue: [],
 			highValue: [],
@@ -224,6 +231,11 @@ let ai = {
 		} else {
 			// this.log(`no successful attack moves possible`, match, myIndex);
 			return false;
+		}
+
+		// Pick a random option for EASY_MODE, increasing the likelihood of a sub-optimal choice
+		if (EASY_MODE) {
+			return bestOptionList[(Math.floor(Math.random() * bestOptionList.length))]
 		}
 
 		// let intelligence = this.parseInformationFromLog(match, myIndex);

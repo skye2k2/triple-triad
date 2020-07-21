@@ -181,6 +181,14 @@ Welcome, adventurer!
 				margin: 0 auto;
 			}
 
+			.create-bot-match.easy {
+				margin-right: 5px;
+			}
+
+			.create-bot-match.hard {
+				margin-left: 5px;
+			}
+
 			.help-button {
 				left:  2px;
 			}
@@ -242,7 +250,8 @@ Welcome, adventurer!
 					</section>
 					<div class="match-buttons">
 						<button class="create-public-match" onclick="createMatch()">Create Public Match</button>
-						<button class="create-bot-match" onclick="createMatch(true, true)">Practice against Bot</button>
+						<button class="create-bot-match easy" onclick="createMatch(false, true, 'EASY')">Play vs. Easy Bot</button>
+						<button class="create-bot-match hard" onclick="createMatch(false, true, 'HARD')">Play vs. Hard Bot</button>
 						<button class="create-private-match" onclick="createMatch(true)">Create Private Match</button>
 					</div>
 				</div>
@@ -295,7 +304,7 @@ Welcome, adventurer!
 		<!-- Begin analytics (analytics.js) - Google Analytics -->
 		<script>
 			// Do not load analytics on localhost
-			// if (document.location.hostname !== 'localhost') {
+			if (document.location.hostname !== 'localhost') {
 				window.addEventListener('load', () => {
 					(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
 						(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -305,7 +314,7 @@ Welcome, adventurer!
 					ga('create', 'UA-5884687-3', 'auto');
 					ga('send', 'pageview');
 				});
-			// }
+			}
 		</script>
 		<!-- End analytics (analytics.js) - Google Analytics -->
 
@@ -366,11 +375,12 @@ Welcome, adventurer!
 				document.dispatchEvent(new CustomEvent('event:cancel-lobby'));
 			}
 
-			function createMatch (private, bot) {
+			function createMatch (private, bot, difficulty) {
 				document.dispatchEvent(new CustomEvent('event:create-lobby', { detail: {
 					private: (private) ? true : false,
 					rules: "BASIC",
 					solo: (bot) ? true : false,
+					difficulty: (difficulty) ? difficulty : undefined
 				}}));
 			}
 

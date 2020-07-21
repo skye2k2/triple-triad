@@ -164,7 +164,7 @@ function createId (idLength = 4) {
 function createLobby (lobbyLeader, gameConfig) {
 	let id = createId();
 	let lobby = {
-		difficulty: gameConfig.difficulty || 'HARD',
+		difficulty: gameConfig.difficulty,
 		lobbyLeader: lobbyLeader,
 		matchId: id,
 		private: gameConfig.private,
@@ -176,7 +176,7 @@ function createLobby (lobbyLeader, gameConfig) {
 		let botId = `${lobby.difficulty}BOT-${createId(2)}`;
 		players.push({
 			bot: true,
-			difficulty: gameConfig.difficulty || 'HARD',
+			difficulty: gameConfig.difficulty,
 			socket: {
 				AI: AI, // In order to play cards, we need a reference to the AI object
 				emit: function () {},
@@ -206,6 +206,7 @@ function createMatch (participants, lobby) {
 			blue: 0
 		},
 		solo: lobby.solo,
+		difficulty: lobby.difficulty,
 		spectators: []
 	};
 
@@ -222,7 +223,7 @@ function createMatch (participants, lobby) {
 		};
 		match.players.push(playerObject);
 		// TODO: CLEANUP: Just have a single state object that contains all of the round and match information to send to the clients, or a function that assembles the data on-the-fly, to keep duplication down
-		participants[i].socket.emit("enter match", Object.assign({}, { matchId: match.matchId, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red', solo: match.solo }));
+		participants[i].socket.emit("enter match", Object.assign({}, { matchId: match.matchId, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: playerObject.color, opponentColor: (playerObject.color === 'red') ? 'blue' : 'red', solo: match.solo, difficulty: match.difficulty }));
 
 		participants[i].socket.join(match.matchId);
 	}

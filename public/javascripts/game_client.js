@@ -131,6 +131,7 @@ function enterMatch (matchDetail) {
 	setState('ingame');
 
 	matchId = matchDetail.matchId;
+	difficulty = matchDetail.difficulty;
 	solo = matchDetail.solo;
 	spectator = matchDetail.spectator;
 
@@ -339,6 +340,10 @@ function calculateWinnerAndLoserDetail (matchDetail, isForMatch) {
 	let scoreLocation = (isForMatch) ? matchDetail.scoreboard : matchDetail.roundStrength;
 	let eventCategory = (isForMatch) ? 'Match' : 'Round';
 
+	if (solo) {
+		eventCategory = `${eventCategory} (${difficulty})`
+	}
+
 	let winnerColor = (scoreLocation && scoreLocation.red > scoreLocation.blue) ? 'red' : 'blue';
 	let loserColor = (scoreLocation && scoreLocation.red > scoreLocation.blue) ? 'blue' : 'red';
 	let score = '';
@@ -377,6 +382,7 @@ function calculateWinnerAndLoserDetail (matchDetail, isForMatch) {
 	}
 
 	if (scoreLocation) {
+		// Track that a round/match was completed, whether as a player or spectator
 		trackEvent(eventCategory, result, score);
 	}
 }
@@ -404,11 +410,15 @@ function endMatch (matchDetail) {
 	// }
 }
 
-function trackEvent (category, action, label) {
-	if (solo) {
-		category = `${category} (solo)`
-	}
+/*
+	ANALYTICS EVENT MATRIX:
 
+	category options: Match/Round [(EASY/HARD)]
+	action: Tie/Win/Lose/Spectate
+	label: {playerScore} - {playerScore}
+
+*/
+function trackEvent (category, action, label) {
 	if (typeof ga !== 'undefined') {
 		ga('send', {
 			hitType: 'event',

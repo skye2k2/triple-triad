@@ -365,7 +365,7 @@ let gameplay = {
 			// If players are out of cards, generate a high-power hand for the final round
 			if (!player.deck.length) {
 				let powerDeckDistribution = {
-					tier6: 1,
+					tier5: 1,
 					tier7: 1,
 					tier8: 1,
 					tier9: 1,
