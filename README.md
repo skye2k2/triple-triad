@@ -31,8 +31,8 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Analytics for completed rounds and matches
 - Adjust tiebreaker power hand to have one weak card, to cut down on ties
 - Allow players to choose bot difficulty
+- Allow matches against the bot to be easily spectated, and note which player is the bot, as well as the difficulty
 - TODO: Display match ID for in-progress matches
-- TODO: Allow matches against the bot to be easily spectated, and note which player is the bot, and the difficulty
 - TODO: Add click-to-copy-functionality to lobby text?
 - TODO: Add close-on-escape functionality to pop-ups
 

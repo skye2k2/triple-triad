@@ -101,7 +101,7 @@ function drawLabel(label) {
 }
 
 //////////  Initialize  \\\\\\\\\\
-var canvas, cardWidth, cardHeight, gameNameText, playerRoundStrengthText, playerRunningScoreText, opponentRoundStrengthText, opponentRunningScoreText, noButtonBlock, yesButtonBlock, stoplight, rematchBlock;
+var canvas, cardWidth, cardHeight, gameNameText, playerRoundStrengthText, playerRunningScoreText, opponentRoundStrengthText, opponentRunningScoreText, botText, noButtonBlock, yesButtonBlock, stoplight, rematchBlock;
 let aspect = 7 / 5; // Play area aspect ratio (width / height)
 let gridSpaces = [];
 let gridCards = [];
@@ -560,6 +560,21 @@ function renderPlayerScore (score, isOpponent) {
 			opponentRoundStrengthText.stroke = opponentColor;
 			canvas.add(text);
 		}
+
+		botText = new fabric.Text(opponentBotLevel, {
+			evented: false,
+			fill: '#333',
+			fontFamily: 'Comic Sans MS, cursive, sans-serif',
+			hasControls: false,
+			left: canvas.width - cardWidth / 2,
+			strokeWidth: 1,
+			originX: 'center',
+			originY: 'center',
+			textAlign: 'center',
+		});
+		botText.top = opponentRoundStrengthText.height * opponentRoundStrengthText.scaleY;
+		botText = botText.scaleToWidth(cardWidth / 3);
+		canvas.add(botText);
 	} else {
 		if (playerRoundStrengthText) {
 			playerRoundStrengthText.text = score;
@@ -569,6 +584,7 @@ function renderPlayerScore (score, isOpponent) {
 			canvas.add(text);
 		}
 	}
+
 	canvas.renderAll();
 }
 
@@ -806,6 +822,7 @@ function isRenderComplete () {
 function startRound (cards, opponentCards) {
 	playerCards = [];
 	playerRoundStrengthText = null;
+	botText = null;
 	opponentCards = [];
 	opponentRoundStrengthText = null;
 	canvas.clear();

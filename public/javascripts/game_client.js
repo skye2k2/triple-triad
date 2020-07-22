@@ -137,6 +137,7 @@ function enterMatch (matchDetail) {
 
 	playerColor = matchDetail.playerColor;
 	opponentColor = matchDetail.opponentColor;
+	opponentBotLevel = (difficulty) ? difficulty : undefined;
 	gameEventQueue = [];
 
 	// If the spectated game is already in-progress, parse out the events from the log and replay them
