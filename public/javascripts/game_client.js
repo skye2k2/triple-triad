@@ -102,7 +102,7 @@ socket.on("no rematch", function () {
 
 // Initialize the game client
 
-// Catch the canvas play-card and rematch events, and send them on to Socket.io
+// Catch the canvas play-card, lobby, and rematch events, and send them on to Socket.io
 document.addEventListener('event:create-lobby', createMatch);
 document.addEventListener('event:cancel-lobby', cancelMatch);
 document.addEventListener('event:play-card', playCard);
@@ -122,7 +122,7 @@ function setState (state) {
 
 function enterLobby (matchId) {
 	// console.log(`${document.location.href}${matchId}`);
-	document.querySelector('.game-link').innerHTML = `${document.location.href}${matchId}`;
+	document.querySelector('.game-link').value = `${document.location.href}${matchId}`;
 	setState('inlobby');
 }
 
@@ -414,7 +414,7 @@ function endMatch (matchDetail) {
 /*
 	ANALYTICS EVENT MATRIX:
 
-	category options: Match/Round [(EASY/HARD)]
+	category: Match/Round [(EASY/HARD)]
 	action: Tie/Win/Lose/Spectate
 	label: {playerScore} - {playerScore}
 

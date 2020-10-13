@@ -374,7 +374,7 @@ let ai = {
 			];
 		}
 
-		// TODO: If two adjacent sides tie for the weakest or are significantly weaker, send a combination, e.g. 'northwest'
+		// Determine the card's weakest side
 		let weakestSide = sides.reduce((accumulator, currentOption) => {
 			if (!accumulator || currentOption.power < accumulator.power) {
 				accumulator = currentOption;
@@ -382,7 +382,42 @@ let ai = {
 			return accumulator;
 		});
 
-		return weakestSide;
+		// Determine any other relatively weak sides
+		const sideStrengthDeviation = 2;
+		let weakestSides = [weakestSide];
+		for (let i = 0; i < sides.length; i++) {
+			if (sides[i] !== weakestSide && sides[i].power < weakestSide.power + sideStrengthDeviation) {
+				weakestSides.push(sides[i]);
+			}
+		}
+
+		// If the card only has two adjacent weak sides, play in a corner to cover both
+		if (!sidesToCheck && weakestSides.length === 2) {
+			let sideText = '';
+			for (let i = 0; i < weakestSides.length; i++) {
+				if (weakestSides[i].direction === 'north' || weakestSides[i].direction === 'south') {
+					sideText = weakestSides[i].direction + sideText;
+				} else if (weakestSides[i].direction === 'east' || weakestSides[i].direction === 'west') {
+					sideText += weakestSides[i].direction;
+				}
+			}
+			// Obviously, we can't cover both opposite sides
+			switch (sideText) {
+				case 'northwest':
+				case 'northeast':
+				case 'southwest':
+				case 'southeast':
+					return {direction: sideText};
+					break;
+				default:
+					return weakestSide;
+					break;
+			}
+		} else {
+			// If the card has one or three weak sides, only cover one of them
+			// OR if we passed in sidesToCheck
+			return weakestSide;
+		}
 	},
 
 	determineOverlap: function (arrayToFilter, arrayToFind) {

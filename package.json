@@ -2,7 +2,7 @@
   "name": "triple-triad",
   "description": "Node + Socket.io canvas-based Triple Triad Game",
   "author": "Clif Bergmann <skye.orkan@gmail.com>",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "main": "server.js",
   "dependencies": {
     "compression": "^1.7.4",

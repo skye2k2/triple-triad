@@ -8,7 +8,7 @@ Built with Node.js, Socket.io, and FabricJS.
 
 ## Stats and Performance
 
-Client initial load weighs in at < 650KB, and utilizes heavy caching for all resources, so that subsequent views are < 50KB.
+Client initial load weighs in at < 650KB, and utilizes heavy caching for all resources, so that subsequent views are < 10KB and do not require additional static assets.
 Node server runs empty at < 20MB of RAM, with 11 threads.
 
 - Each subsequent/simultaneous match (mostly because of the running game log) adds < 2MB of memory usage, and is mostly reclaimed when the connection ends
@@ -26,25 +26,26 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 ## Changelog:
 
 <details>
-<summary>Version 0.1.2 - RELEASE PENDING</summary>
+<summary>Version 0.1.2 - 2020-10-13</summary>
 
 - Analytics for completed rounds and matches
+- Add HTML metadata
 - Adjust tiebreaker power hand to have one weak card, to cut down on ties
 - Allow players to choose bot difficulty
+- Improve initial card placement logic to potentially protect more than one side
 - Allow matches against the bot to be easily spectated, and note which player is the bot, as well as the difficulty
-- TODO: Display match ID for in-progress matches
-- TODO: Add click-to-copy-functionality to lobby text?
-- TODO: Add close-on-escape functionality to pop-ups
-
+- Add click-to-copy functionality to lobby text
+- Add close button & close-on-escape functionality to pop-ups
+- Clean up & reduce size of corner background image
+- Reduce size of card back & favicon
 </details>
 
 <details>
 <summary>Version 0.1.1 - 2020-06-16</summary>
 
-- AI improved to always make an immediately beneficial move. Multiple attack or defense positions are prioritized above all else.
+- AI improved to always make an immediately beneficial move. Overlapping attack/defense positions are prioritized above all else.
 
 </details>
-
 <summary>Version 0.1.0 - 2020-05-23 (initial functionality)</summary>
 
 ![Version 0.1.0 Lobby Image](_extra/screenshots/v0.1.0-lobby.png)
@@ -67,7 +68,7 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Only active player can play cards
 - Server-side validation of cards & card placement, to keep things from being too easy for hackers
 - Sound effects for playing and flipping cards, and winning and losing the match
-- Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce in time to the music)
+- Shuffle or Boogie music (remix by Simple Music), with subtle playing indication (notes bounce mostly in time to the music)
 </details>
 
 <details>
@@ -75,8 +76,12 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 
 #### TODO List:
 
+- TODO: Analytics for started and abandoned matches
+- TODO: Display match ID for in-progress matches
+- TODO: Add puh-ting and rrrgh sounds for winning/losing round
 - Gracefully handle double-clicking of rematch button
-- HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones)
+- HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones) I think we still have to take zoom into better account, and everything will line up
+- HALF DONE: Advanced AI logic, based on move and card analysis
 - Add keyboard/controller support
 - Add "hint", for easy mode, that runs the AI function to determine the best move, and highlights the suggested card and location to play it
 - Figure out why favicon is requested for each card move
@@ -95,7 +100,8 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Allow page refresh without quitting match
 - Add fun Final Fantasy VIII facts to push to clients while waiting for a game
 - Track stats (plays/captures/losses per card and game mode)?
-- Permanently store game results (which would enable replays)
+- Permanently store game results (which would enable saved replays)
+- Ability to replay a match from a game log
 - Dynamically create all card content (power numbers, name, border)
 - Add support and options for Final Fantasy XIV cards and modes
 

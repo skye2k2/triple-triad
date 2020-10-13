@@ -2,12 +2,20 @@
 <html lang="en">
 <!--
 Welcome, adventurer!
+
+What you see before you has been a labor of love for a mini-game that I honestly spent more time playing than the storyline of the game it came as a part of (although it, too, was impressive).
+
+May the guardian forces always be with you.
 -->
 	<head>
 		<meta charset="utf-8" />
 		<title>Triple Triad</title>
-		<link rel="shortcut icon" type="image/png" href="/images/favicon.png"/>
-		<meta name=viewport content="width=device-width, initial-scale=1">
+		<link rel="shortcut icon" type="image/png" href="/images/favicon.png" />
+		<meta name="application-name" content="Triple Triad" />
+		<meta name="author" content="skye2k2" />
+		<meta name="description" content="Slimmed-down version of Triple Triad, the premier mini-game of FFVIII, built on Node.js, Socket.io, and FabricJS. All rights reserved by their respective owners." />
+		<meta name="keywords" content="(トリプルトライアード, Toripuru Toraiādo)" />
+		<meta name=viewport content="width=device-width, initial-scale=1" />
 		<!-- <link rel="stylesheet" type="text/css" href="stylesheets/style.css"> -->
 		<style type="text/css">
 			body {
@@ -110,9 +118,20 @@ Welcome, adventurer!
 				display: flex;
 			}
 
+			.game-link-wrapper {
+				position: relative;
+				width: fit-content;
+			}
+
 			.game-link {
+				background: none;
+				border: none;
+				height: 1.5rem;
 				margin: 0;
 				padding: 20px;
+				resize: none;
+				white-space: nowrap;
+				width: 100%;
 			}
 
 			.game-link,
@@ -149,7 +168,6 @@ Welcome, adventurer!
 			button {
 				background: transparent;
 				border-radius: 4px;
-				bottom: 2px;
 				color: #fff;
 				cursor: pointer;
 				font-size: 20px;
@@ -190,11 +208,24 @@ Welcome, adventurer!
 			}
 
 			.help-button {
+				bottom: 2px;
 				left:  2px;
 			}
 
 			.music-button {
+				bottom: 2px;
 				right: 2px;
+			}
+
+			.copy-button {
+				left: -40px;
+    		top: 10px;
+			}
+
+			.close-button {
+				color: #333;
+				top: 4px;
+				right: 4px;
 			}
 
 			.fullscreen {
@@ -258,7 +289,7 @@ Welcome, adventurer!
 
 				<div class="billboard">
 					<h2>Send this link to a friend:</h2>
-					<p class="game-link"></p>
+					<div class="game-link-wrapper"><textarea class="game-link copyable"></textarea><button class="copy-button" type="button" title="Copy URL" onclick="copy(this)">📋</button></div>
 					<p class="subtext">After the first person has joined, the match will begin,<br/>and anyone else using the link will be able to spectate.</p>
 					<p>OR, <button class="cancel-lobby" onclick="cancelMatch()">go back</button> to lobbies</p>
 				</div>
@@ -267,7 +298,8 @@ Welcome, adventurer!
 		</div>
 		<button class="help-button" type="button" title="How To Play Triple Triad" onclick="showHowToPlay()">♕?</button>
 		<button class="music-button" type="button" title="Toggle Music" onclick="toggleMusic(this)"><span class="note-1 bounce">♪</span>&nbsp;<span class="note-2 bounce">♬</span></button>
-		<div id="how-to-play" class="fullscreen" onclick="hideHowToPlay()" hidden>
+		<div id="how-to-play" class="fullscreen" hidden>
+			<button class="close-button" type="button" title="Close" onclick="hidePopup()">X</button>
 			<h1>How To Play Triple Triad</h1>
 			<p>
 				Triple Triad is a two-player game played on a three-by-three (3x3) square grid. Each card has four numbers (known as ranks) placed in top left corner; each number corresponds to one of the four sides of the card. The ranks range from one to ten, the letter A representing ten. Colored cards belong to the player and monochromatic cards belong to the opponent.
@@ -363,8 +395,27 @@ Welcome, adventurer!
 				}
 			}
 
-			function hideHowToPlay () {
-				document.querySelector('#how-to-play').setAttribute('hidden', 'true');
+			function copy (el) {
+				copyTarget = el.parentElement.querySelector('.copyable')
+				if (copyTarget && copyTarget.select) {
+					copyTarget.select();
+					document.execCommand('copy');
+				}
+			}
+
+			// Since both the lobby billboard and how-to-play are popup-esque, close them both the same way
+			function hidePopup (evt) {
+				if (evt.key === "Escape") {
+					let billboardEl = document.querySelector('.billboard')
+					let howToPlayEl = document.querySelector('#how-to-play')
+					if (!howToPlayEl.hasAttribute('hidden')) {
+						howToPlayEl.setAttribute('hidden', 'true');
+						return
+					} else if (document.body.hasAttribute('inLobby')) {
+						cancelMatch()
+						return
+					}
+				}
 			}
 
 			function showHowToPlay () {
@@ -394,6 +445,7 @@ Welcome, adventurer!
 			}
 
 			document.getElementById('content').addEventListener('click', impatience);
+			document.addEventListener('keyup', hidePopup);
 		</script>
 	</body>
 </html>
