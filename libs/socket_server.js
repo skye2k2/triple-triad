@@ -43,7 +43,7 @@ module.exports.listen = function (app) {
 				console.log(`Spectator joined match ${potentialMatchId}`);
 				match.spectators.push({socket: socket});
 				// Setting spectator: true is critical for spectators to work
-				socket.emit("enter match", Object.assign({}, { spectator: true, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: 'blue', opponentColor: 'red', difficulty: match.difficulty, log: match.log }));
+				socket.emit("enter match", Object.assign({}, { spectator: true, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: 'blue', opponentColor: 'red', difficulty: match.difficulty, log: match.log, matchId: potentialMatchId }));
 				socket.join(potentialMatchId);
 			}
 		}

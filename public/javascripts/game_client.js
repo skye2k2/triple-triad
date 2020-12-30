@@ -13,6 +13,7 @@ let playerColor = '';
 let playerRoundScore = 0;
 let playerRoundStrength = 5;
 let playerRunningScore;
+let opponentBotLevel;
 let opponentColor = '';
 let opponentRoundScore = 0;
 let opponentRoundStrength = 5;

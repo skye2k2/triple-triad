@@ -550,6 +550,7 @@ function renderPlayerScore (score, isOpponent) {
 		originY: 'top',
 		textAlign: 'center',
 	});
+
 	text = text.scaleToWidth(cardWidth / 3);
 
 	if (isOpponent) {
@@ -561,20 +562,22 @@ function renderPlayerScore (score, isOpponent) {
 			canvas.add(text);
 		}
 
-		botText = new fabric.Text(opponentBotLevel, {
-			evented: false,
-			fill: '#333',
-			fontFamily: 'Comic Sans MS, cursive, sans-serif',
-			hasControls: false,
-			left: canvas.width - cardWidth / 2,
-			strokeWidth: 1,
-			originX: 'center',
-			originY: 'center',
-			textAlign: 'center',
-		});
-		botText.top = opponentRoundStrengthText.height * opponentRoundStrengthText.scaleY;
-		botText = botText.scaleToWidth(cardWidth / 3);
-		canvas.add(botText);
+		if (opponentBotLevel) {
+			botText = new fabric.Text(opponentBotLevel, {
+				evented: false,
+				fill: '#333',
+				fontFamily: 'Comic Sans MS, cursive, sans-serif',
+				hasControls: false,
+				left: canvas.width - cardWidth / 2,
+				strokeWidth: 1,
+				originX: 'center',
+				originY: 'center',
+				textAlign: 'center',
+			});
+			botText.top = opponentRoundStrengthText.height * opponentRoundStrengthText.scaleY;
+			botText = botText.scaleToWidth(cardWidth / 3);
+			canvas.add(botText);
+		}
 	} else {
 		if (playerRoundStrengthText) {
 			playerRoundStrengthText.text = score;
@@ -796,7 +799,22 @@ function renderScoreStoplight () {
 		}
 	}
 
-	// TODO: Display Match ID underneath stoplight
+	let matchIdText = new fabric.Text(matchId, {
+		evented: false,
+		fill: '#333',
+		fontFamily: 'Comic Sans MS, cursive, sans-serif',
+		hasControls: false,
+		left: canvas.width / 2,
+		strokeWidth: 0.5,
+		top: 10 + cardHeight / 4,
+		originX: 'center',
+		originY: 'top',
+		textAlign: 'center',
+	});
+
+	matchIdText = matchIdText.scaleToWidth(cardWidth / 3);
+
+	canvas.add(matchIdText);
 
 	renderPlayerRunningScore(playerRunningScore);
 	renderPlayerRunningScore(opponentRunningScore, true);

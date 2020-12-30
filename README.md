@@ -26,11 +26,19 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 ## Changelog:
 
 <details>
+<summary>Version 0.1.3 - RELEASE PENDING</summary>
+
+- Display match ID for in-progress matches
+- Bugfix: Broken how to play close button
+- Bugfix: Broken PVP matches after first turn, due to null-checking error for text rendering
+</details>
+
+<details>
 <summary>Version 0.1.2 - 2020-10-13</summary>
 
 - Analytics for completed rounds and matches
 - Add HTML metadata
-- Adjust tiebreaker power hand to have one weak card, to cut down on ties
+- Adjust tiebreaker power hand to have one weak card, to cut down on gridlocked ties
 - Allow players to choose bot difficulty
 - Improve initial card placement logic to potentially protect more than one side
 - Allow matches against the bot to be easily spectated, and note which player is the bot, as well as the difficulty
@@ -44,8 +52,9 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 <summary>Version 0.1.1 - 2020-06-16</summary>
 
 - AI improved to always make an immediately beneficial move. Overlapping attack/defense positions are prioritized above all else.
-
 </details>
+
+<details>
 <summary>Version 0.1.0 - 2020-05-23 (initial functionality)</summary>
 
 ![Version 0.1.0 Lobby Image](_extra/screenshots/v0.1.0-lobby.png)
@@ -77,14 +86,13 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 #### TODO List:
 
 - TODO: Analytics for started and abandoned matches
-- TODO: Display match ID for in-progress matches
 - TODO: Add puh-ting and rrrgh sounds for winning/losing round
 - Gracefully handle double-clicking of rematch button
 - HALF DONE: Resize all of the elements in the canvas on page resize (especially for orientation changes on phones) I think we still have to take zoom into better account, and everything will line up
 - HALF DONE: Advanced AI logic, based on move and card analysis
 - Add keyboard/controller support
 - Add "hint", for easy mode, that runs the AI function to determine the best move, and highlights the suggested card and location to play it
-- Figure out why favicon is requested for each card move
+- Figure out why favicon is requested for each card move (and even dragging & dropping the rematch billboard)
 - Add all extended game rule options (Open, Chain, Plus)
 - Add minimal stats to main lobby (number of players/matches/final score)
 - Perfectly centered game board and title positioning
@@ -104,5 +112,4 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 - Ability to replay a match from a game log
 - Dynamically create all card content (power numbers, name, border)
 - Add support and options for Final Fantasy XIV cards and modes
-
 </details>
