@@ -165,19 +165,30 @@ let ai = {
 
 		// If there are no attackable spaces, play in a defensible position to keep cards I own
 		if (boardAnalysis.defendableSpaces.length) {
-			let mostVulnerableLocation = this.determineMostVulnerableLocation(match, boardAnalysis);
-			if (mostVulnerableLocation) {
+			let mostVulnerableLocationDetail = this.determineMostVulnerableLocation(match, boardAnalysis);
+
+			if (mostVulnerableLocationDetail.value < 7) {
+				this.log(`tried to cover most vulnerable space, but defending value was too high`, match, myIndex);
+			}
+
+			// TODO/BUG: Make sure the new lowestExposedSide is not * just as low or lower* than the current one OR that the currently exposed sides are not just fine by themselves
+			if (mostVulnerableLocationDetail && mostVulnerableLocationDetail.value < 7) {
 				this.log(`playing card to cover most vulnerable space`, match, myIndex);
-				return this.formatPlay(match, myIndex, worstCardIndex, mostVulnerableLocation);
+				return this.formatPlay(match, myIndex, worstCardIndex, mostVulnerableLocationDetail.location);
 			}
 		}
 
-		// If there are no appealing options, just play my lowest card in an available space
+		// If there are no appealing attack/defense options, just play my lowest card in an available space
 		// TODO: Play defensively along the card's weak edge, similar to the above, but taking available spaces into account
 		// TODO: OR play a high-defense card in its power corner
 		if (boardAnalysis.openSpaces.length) {
-			this.log(`no good options--playing card in a random open space`, match, myIndex);
-			return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
+			if (boardAnalysis.openSpaces.length === 1) {
+				this.log(`no good options--playing card in last open space`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
+			} else {
+				this.log(`no good options--playing card in a random open space`, match, myIndex);
+				return this.formatPlay(match, myIndex, worstCardIndex, this.pickRandomItem(boardAnalysis.openSpaces));
+			}
 		} else {
 			this.log(`ERROR: no open spaces`, match, myIndex);
 		}
@@ -274,6 +285,7 @@ let ai = {
 		return cheapestOption;
 	},
 
+	// Given a card location, determine which sides are exposed to attack
 	determineExposedSides: function (boardAnalysis, location) {
 		attackLocations = this.findLocationsToAttackFrom(boardAnalysis.openSpaces, location);
 		if (attackLocations.length) {
@@ -308,6 +320,7 @@ let ai = {
 		}
 	},
 
+	// Given my currently-played cards, what is the location where the lowest value is exposed to my opponent?
 	determineMostVulnerableLocation: function (match, boardAnalysis) {
 		let lowestExposedDetailList = [];
 
@@ -355,9 +368,10 @@ let ai = {
 		}
 
 
-		return `${coords[0]},${coords[1]}`;
+		return {location: `{${coords[0]},${coords[1]}`, value: lowestExposedCardDetail[lowestExposedCardDetail.direction]};
 	},
 
+	// Given a particular card, determine its most vulnerable side (or corner, if not passed sidesToCheck)
 	determineWeakSide: function (card, sidesToCheck) {
 		let sides = [];
 
@@ -420,6 +434,7 @@ let ai = {
 		}
 	},
 
+	// Check intersection of two sets
 	determineOverlap: function (arrayToFilter, arrayToFind) {
 		let arrayOverlap = arrayToFilter.filter((value) => { arrayToFind.includes(value); });
 		if (arrayOverlap.length) {
@@ -434,7 +449,7 @@ let ai = {
 		return array[randomIndex];
 	},
 
-	// Parse game board to index all open board locations, occupied locations, and attackable locations
+	// Parse game board to index all open board locations, occupied locations, and attackable/defendable locations
 	parseGameBoard: function (match, myIndex) {
 		let parsedGameBoard = {
 			attackableSpaces: [],
@@ -496,6 +511,7 @@ let ai = {
 		return parsedGameBoard;
 	},
 
+	// Based on the currently available open spaces on the board and a given opponent card location, determine where the card can be attacked from
 	findLocationsToAttackFrom: function (openSpaces, location) {
 		let attackLocations = [];
 		let coords = location.split(',');
@@ -557,7 +573,7 @@ let ai = {
 		return minMaxCardIndex;
 	},
 
-	// Return if the board is empty (and we obviously shouldn't run extra logic to determine where to play)
+	// Return the count of occupied board spaces, to determine if the board is empty (and we obviously shouldn't run extra logic to determine where to play)
 	countOccupiedBoardSpaces: function (match) {
 		occupiedBoardSpaces = 0;
 		// Loop through board and count the occupied spaces
@@ -570,6 +586,7 @@ let ai = {
 		return occupiedBoardSpaces;
 	},
 
+	// Convert a comma-separated location string into its corresponding coordinates array location
 	locationToCoords: function (location) {
 		if (typeof location === 'string') {
 			coords = location.split(',');

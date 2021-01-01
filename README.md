@@ -29,6 +29,7 @@ The game, its rules, characters, and artwork are all copyrighted by Square Enix.
 <summary>Version 0.1.3 - RELEASE PENDING</summary>
 
 - Display match ID for in-progress matches
+- Add bot vs. bot demo spectate functionality
 - Bugfix: Broken how to play close button
 - Bugfix: Broken PVP matches after first turn, due to null-checking error for text rendering
 </details>

@@ -271,7 +271,7 @@ let gameplay = {
 	endMatch: function (match) {
 		// totalMatchesPlayed++;
 		// console.log(`END MATCH: ${match.matchId}`);
-		io.to(match.matchId).emit("end match", {scoreboard: match.scoreboard, log: match.log, runningScore: match.runningScore});
+		io.to(match.matchId).emit("end match", {scoreboard: match.scoreboard, log: match.log, runningScore: match.runningScore, matchId: match.matchId});
 		match.isOver = true;
 
 		io.updateMatchStatistics();
@@ -291,11 +291,11 @@ let gameplay = {
 			return;
 		} else if (redRoundScore > blueRoundScore) {
 			this.log(`End Round ${match.roundNumber}`, match);
-			this.log(`red win round: (${redRoundScore} - ${blueRoundScore})`, match);
+			this.log(`red:win round: (${redRoundScore} - ${blueRoundScore})`, match);
 			match.scoreboard.red++;
 		} else if (blueRoundScore > redRoundScore) {
 			this.log(`End Round ${match.roundNumber}`, match);
-			this.log(`blue win round: (${blueRoundScore} - ${redRoundScore})`, match);
+			this.log(`blue:win round: (${blueRoundScore} - ${redRoundScore})`, match);
 			match.scoreboard.blue++;
 		}
 
@@ -307,14 +307,14 @@ let gameplay = {
 		// Check if game is over, otherwise start the next round
 		if (redTotalScore === 2) {
 			match.runningScore.red++
-			this.log(`red: WIN MATCH (${redTotalScore} - ${blueTotalScore})`);
+			this.log(`red:WIN MATCH: (${redTotalScore} - ${blueTotalScore})`);
 			this.endMatch(match);
 		} else if (blueTotalScore === 2) {
 			match.runningScore.blue++
-			this.log(`blue: WIN MATCH (${blueTotalScore} - ${redTotalScore})`);
+			this.log(`blue:WIN MATCH: (${blueTotalScore} - ${redTotalScore})`);
 			this.endMatch(match);
 		} else {
-			this.log(`Total Score: red: ${redTotalScore} blue: ${blueTotalScore}`);
+			this.log(`Current Score: red: ${redTotalScore} blue: ${blueTotalScore}`);
 			this.startNewRound(match);
 		}
 	},

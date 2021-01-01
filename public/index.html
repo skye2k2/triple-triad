@@ -56,7 +56,8 @@ May the guardian forces always be with you.
 			}
 
 			[lurking] .overlay,
-			[inlobby] .overlay {
+			[inlobby] .overlay,
+			[spectated] .overlay {
 				display: block;
 			}
 
@@ -89,6 +90,7 @@ May the guardian forces always be with you.
 			.lobby-list li::before,
 			.game-list li::before {
 				background-image: url('/images/cards/back.png');
+				background-repeat: no-repeat;
 				background-size: contain;
 				border-radius: 3px;
 				content: '';
@@ -100,7 +102,8 @@ May the guardian forces always be with you.
 				width: 1.15rem;
 			}
 
-			.billboard {
+			.billboard,
+			.spectator-popup {
 				align-items: center;
 				background-color: rgba(221, 170, 68, 0.5);
 				bottom: 0;
@@ -114,7 +117,8 @@ May the guardian forces always be with you.
 				top: 0;
 			}
 
-			[inlobby] .billboard {
+			[inlobby] .billboard,
+			[spectated] .spectator-popup {
 				display: flex;
 			}
 
@@ -191,8 +195,18 @@ May the guardian forces always be with you.
 			.create-public-match,
 			.create-private-match,
 			.create-bot-match,
-			.cancel-lobby {
+			.cancel-lobby,
+			.spectator-button {
+				background-color: #d79d28;
 				position: relative;
+			}
+
+			.create-public-match:active,
+			.create-private-match:active,
+			.create-bot-match:active,
+			.cancel-lobby:active,
+			.spectator-button:active {
+				background-color: #bf8819;
 			}
 
 			.create-bot-match {
@@ -260,6 +274,15 @@ May the guardian forces always be with you.
 				100% { transform: scale(1,1)     translateY(0); }
 			}
 
+			@media (max-width: 860px) {
+				.create-bot-match.easy {
+					margin-left: 10px;
+				}
+
+				.create-bot-match.hard {
+					margin-right: 10px;
+				}
+			}
 		</style>
 	</head>
 
@@ -285,6 +308,12 @@ May the guardian forces always be with you.
 						<button class="create-bot-match hard" onclick="createMatch(false, true, 'HARD')">Play vs. Hard Bot</button>
 						<button class="create-private-match" onclick="createMatch(true)">Create Private Match</button>
 					</div>
+				</div>
+
+				<div class="spectator-popup">
+					<h2><span class="winner"></span> wins!</h2>
+
+					<p><!--<button class="spectator-button" onclick="rewatchDemo()">Re-watch match</button>, <button class="spectator-button" onclick="watchAnotherDemo()">watch another match</button>, or --><button class="spectator-button" onclick="endDemo()">go back</button> to lobbies</p>
 				</div>
 
 				<div class="billboard">
@@ -403,13 +432,17 @@ May the guardian forces always be with you.
 				}
 			}
 
-			// Since both the lobby billboard and how-to-play are popup-esque, close them both the same way
+			// Since the lobby billboard, spectator summary, and how-to-play are all popup-esque, close them the same way
 			function hidePopup (evt) {
 				if (!evt || evt.key === "Escape") {
 					let billboardEl = document.querySelector('.billboard')
+					let spectatorEl = document.querySelector('.spectator-popup')
 					let howToPlayEl = document.querySelector('#how-to-play')
 					if (!howToPlayEl.hasAttribute('hidden')) {
 						howToPlayEl.setAttribute('hidden', 'true');
+						return
+					} else if (!spectatorEl.hasAttribute('hidden')) {
+						spectatorEl.setAttribute('hidden', 'true');
 						return
 					} else if (document.body.hasAttribute('inLobby')) {
 						cancelMatch()
@@ -433,6 +466,18 @@ May the guardian forces always be with you.
 					solo: (bot) ? true : false,
 					difficulty: (difficulty) ? difficulty : undefined
 				}}));
+			}
+
+			function endDemo () {
+				document.dispatchEvent(new CustomEvent('event:end-demo'));
+			}
+
+			function rewatchDemo () {
+				document.dispatchEvent(new CustomEvent('event:rewatch-demo'));
+			}
+
+			function watchAnotherDemo () {
+				document.dispatchEvent(new CustomEvent('event:watch-another-demo'));
 			}
 
 			// Clicks will fall through all the way to the content wrapper, if the canvas is disabled

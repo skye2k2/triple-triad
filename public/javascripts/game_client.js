@@ -2,11 +2,12 @@
 
 let socket = io();
 
-let ANIMATION_TIME = 600;
+let DEFAULT_ANIMATION_TIME = 600;
 let animationTimeout;
 let canPlayCard = false;
 let debugMode = false;
 let gameEventQueue = [];
+let isOver = false;
 let log;
 let matchId = '';
 let playerColor = '';
@@ -108,6 +109,9 @@ document.addEventListener('event:create-lobby', createMatch);
 document.addEventListener('event:cancel-lobby', cancelMatch);
 document.addEventListener('event:play-card', playCard);
 document.addEventListener('event:rematch', rematch);
+document.addEventListener('event:end-demo', endDemo);
+document.addEventListener('event:rewatch-demo', rewatchDemo);
+document.addEventListener('event:watch-another-demo', watchAnotherDemo);
 
 socket.emit("request game list");
 
@@ -140,6 +144,10 @@ function enterMatch (matchDetail) {
 	opponentColor = matchDetail.opponentColor;
 	opponentBotLevel = (difficulty) ? difficulty : undefined;
 	gameEventQueue = [];
+	isOver = false;
+
+	// Increase the animation time for bot matches
+	ANIMATION_TIME = (matchId === "DEMO" && !window.location.href.includes("localhost")) ? DEFAULT_ANIMATION_TIME * 2 : DEFAULT_ANIMATION_TIME;
 
 	// If the spectated game is already in-progress, parse out the events from the log and replay them
 	if (matchDetail.log && matchDetail.log.length) {
@@ -267,6 +275,8 @@ function generateReplayFromLog (matchDetail) {
 					}
 					gameEventQueue.push({type: 'flip', location: logBits[2], matchDetail: { roundStrength: {red: opponentRoundStrength, blue: playerRoundStrength}}});
 					break;
+				case 'win round':
+					break;
 				default:
 					console.warn(`Unknown log entry format: ${log[i]}`);
 					break;
@@ -305,12 +315,24 @@ function updateGameList(selector, list) {
 	let listEl = document.querySelector(selector);
 	listEl.innerHTML = '';
 
+	let activeDemo = false;
+
 	for (let i = 0; i < list.length; i++) {
 		let match = list[i];
+		if (match.id === "DEMO") {
+			activeDemo = true;
+		}
+
 		let row = document.createElement("li");
 		let score =  (selector === '.game-list') ? `(${match.runningScore.blue} - ${match.runningScore.red})` : '';
 		row.innerHTML = `<a href='/${match.id}' title='Join this match${(selector === '.game-list') ? " as a spectator" : ""}'>${match.id} ${score}</a>`;
 		listEl.appendChild(row);
+	}
+
+	if (!activeDemo && selector === '.game-list') {
+		let demoRow = document.createElement("li");
+		demoRow.innerHTML = `<a href='/DEMO' title='Spectate a bot match'>Watch Demo</a>`;
+		listEl.prepend(demoRow);
 	}
 }
 
@@ -378,14 +400,41 @@ function calculateWinnerAndLoserDetail (matchDetail, isForMatch) {
 	} else {
 		result = 'Spectate'
 		// TODO: Use game status notifications, instead of alerts
-		if (isForMatch) {
-			alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
+		if (isForMatch && !isOver) {
+			isOver = true;
+			document.querySelector(".spectator-popup .winner").innerHTML = (matchId === "DEMO") ? `${winnerColor} bot` : winnerColor;
+			// alert(`${winnerColor} wins! (${matchDetail.scoreboard[winnerColor]} - ${matchDetail.scoreboard[loserColor]})`);
 		}
 	}
 
 	if (scoreLocation) {
 		// Track that a round/match was completed, whether as a player or spectator
 		trackEvent(eventCategory, result, score);
+	}
+}
+
+
+
+// Trigger playerDisconnected on server. Only allowed for spectators of pure bot DEMO matches. Needed so that refreshing will generate a new match.
+function endDemo () {
+	if (matchId === "DEMO") {
+		socket.emit("end");
+	}
+	window.location = window.location.origin;
+}
+
+// Re-watch the same DEMO match.
+function rewatchDemo () {
+	if (matchId === "DEMO") {
+		window.location.reload();
+	}
+}
+
+// Watch a new DEMO match.
+function watchAnotherDemo () {
+	if (matchId === "DEMO") {
+		socket.emit("end");
+		window.location.reload();
 	}
 }
 
@@ -400,6 +449,9 @@ function endMatch (matchDetail) {
 
 		enableCards(true);
 
+		if (spectator) {
+			setState('spectated');
+		}
 	}, ANIMATION_TIME * 2);
 
 	// if (matchEndReason === "player left") {

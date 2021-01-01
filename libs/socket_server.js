@@ -12,7 +12,7 @@ let matches = [];
 // let totalMatchesPlayed = 0;
 let totalCardsPlayed = 0;
 
-const matchChecker = RegExp(/[ACDEFGHJKLMNPRTUWXY3679]{4}/);
+const matchChecker = RegExp(/[ACDEFGHJKLMNPRTWXY3679]{4}/);
 
 //////////  Socket.io  \\\\\\\\\\
 module.exports.listen = function (app) {
@@ -46,6 +46,23 @@ module.exports.listen = function (app) {
 				socket.emit("enter match", Object.assign({}, { spectator: true, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: 'blue', opponentColor: 'red', difficulty: match.difficulty, log: match.log, matchId: potentialMatchId }));
 				socket.join(potentialMatchId);
 			}
+		} else if (potentialMatchId === "DEMO") {
+			// DEMO: A short-circuited bot vs. bot match
+			console.log(`DEMO match requested`);
+			let gameConfig = {
+				difficulty: "HARD",
+				matchId: "DEMO",
+				private: false,
+				rules: "BASIC",
+				solo: true
+			}
+			createLobby(findPlayerBySocketId(socket.id), gameConfig);
+
+			match = findMatchById(potentialMatchId);
+			match.spectators.push({socket: socket});
+			// Setting spectator: true is critical for spectators to work
+			socket.emit("enter match", Object.assign({}, { spectator: true, roundStrength: match.roundStrength, scoreboard: match.scoreboard, runningScore: match.runningScore, playerColor: 'blue', opponentColor: 'red', difficulty: match.difficulty, log: match.log, matchId: potentialMatchId }));
+			socket.join(potentialMatchId);
 		}
 
 		// TODO: Determine what triggers on a page refresh and add spectator cleanup to the list of things to do
@@ -55,8 +72,14 @@ module.exports.listen = function (app) {
 			console.log("See if we still have the match data, and can rebuild the board and player's hand from the game log.");
 		});
 
+		// Only happens on page refresh
 		socket.on("disconnect", function () {
 			// console.log("Your opponent disconnected. Waiting 10 seconds to see if they reconnect, before they automatically forfeit the match.");
+			playerDisconnected(socket);
+		});
+
+		socket.on("end", function () {
+			// IF MATCH IS DEMO MATCH
 			playerDisconnected(socket);
 		});
 
@@ -133,7 +156,7 @@ function log (logString) {
 
 function createId (idLength = 4) {
 	var id = "";
-	var charset = "ACDEFGHJKLMNPRTUWXY3679"; // Only use easy-to-read options
+	var charset = "ACDEFGHJKLMNPRTWXY3679"; // Only use easy-to-read options
 	for (var i = 0; i < idLength; i++) {
 		id += charset.charAt(Math.floor(Math.random() * charset.length));
 	}
@@ -161,35 +184,49 @@ function createId (idLength = 4) {
 	return id;
 }
 
+function createBot (lobby) {
+	let botId = `${lobby.difficulty}BOT-${createId(2)}`;
+	log(`${botId} created for match: ${lobby.matchId}`);
+
+	return {
+		bot: true,
+		difficulty: lobby.difficulty,
+		socket: {
+			AI: AI, // In order to play cards, we need a reference to the AI object
+			emit: function () {},
+			join: function () {},
+			id: botId
+		}
+	};
+}
+
 function createLobby (lobbyLeader, gameConfig) {
 	let id = createId();
 	let lobby = {
 		difficulty: gameConfig.difficulty,
 		lobbyLeader: lobbyLeader,
-		matchId: id,
+		matchId: gameConfig.matchId || id,
 		private: gameConfig.private,
 		rules: gameConfig.rules,
 		solo: gameConfig.solo
 	};
 
+	log(`CREATE ${gameConfig.private ? 'PRIVATE ' : ''}LOBBY: ${lobby.matchId}`);
+
 	if (gameConfig.solo) {
-		let botId = `${lobby.difficulty}BOT-${createId(2)}`;
-		players.push({
-			bot: true,
-			difficulty: gameConfig.difficulty,
-			socket: {
-				AI: AI, // In order to play cards, we need a reference to the AI object
-				emit: function () {},
-				join: function () {},
-				id: botId
-			}
-		});
-		log(`${botId} created for match: ${id}`);
-		createMatch([lobbyLeader, findPlayerBySocketId(botId)], lobby);
+		let bot = createBot(lobby);
+		players.push(bot);
+
+		if (gameConfig.matchId === "DEMO") {
+			let secondBot = createBot(lobby);
+			players.push(secondBot);
+			createMatch([findPlayerBySocketId(bot.socket.id), findPlayerBySocketId(secondBot.socket.id)], lobby);
+		} else {
+			createMatch([lobbyLeader, findPlayerBySocketId(bot.socket.id)], lobby);
+		}
 	} else {
 		lobbies.push(lobby);
-		lobbyLeader.socket.emit("lobby created", id);
-
+		lobbyLeader.socket.emit("lobby created", lobby.matchId);
 		io.updateMatchStatistics();
 	}
 }
@@ -261,6 +298,12 @@ function findMatchBySocketId (socketId) {
 				return matches[i];
 			}
 		}
+
+		for (var j = 0; j < matches[i].spectators.length; j++) {
+			if (matches[i].spectators[j].socket.id === socketId) {
+				return matches[i];
+			}
+		}
 	}
 	for (var i = 0; i < lobbies.length; i++) {
 		if (lobbies[i].lobbyLeader.socket.id === socketId) {
@@ -288,21 +331,40 @@ function leaveMatch (socket) {
 		// } else {
 		// 	io.to(match.matchId).emit("no rematch");
 		// }
-		removeMatch(match);
+		if (match.matchId === "DEMO") {
+		// 	// Do not remove match if there are additional spectators
+		// 	console.log(`SPECTATORS REMAINING: ${match.spectators.length}`);
+		// 	if (match.spectators.length === 0) { // THIS IS NOT CURRENTLY WORKING
+				console.log(`DEMO match replay ended`);
+				removeMatch(match);
+			// }
+		} else {
+			removeMatch(match);
+		}
 	}
 }
 
 function playerDisconnected (socket) {
-	var player = findPlayerBySocketId(socket.id);
-	var index = players.indexOf(player);
-	if (index > -1) {
-		leaveMatch(socket);
-		players.splice(index, 1);
+	var match = findMatchBySocketId(socket.id);
+	if (match) {
+		var player = findPlayerBySocketId(socket.id);
+		var index = players.indexOf(player);
+		if (index > -1) {
+			leaveMatch(socket);
+			players.splice(index, 1);
+		}
+
+		var index = match.spectators.indexOf(player);
+		if (index > -1) {
+			leaveMatch(socket);
+			match.spectators.splice(index, 1);
+		}
 	}
 	// TODO: Remove any lobbies or matches the player is part of
 }
 
 function rematchRequested (socket) {
+	// TODO: Allow spectators to request a rematch for DEMO matches
 	var match = findMatchBySocketId(socket.id);
 	if (match) {
 		if ((match.rematch && match.rematch !== socket.id) || match.solo) {
@@ -336,6 +398,5 @@ function startLobby (socket, gameConfig) {
 	// TODO: Set up additional bits, and move pieces from createMatch(), as necessary
 }
 
-// TODO: Have a clean way to set up a mock match (or a demo match for instructive purposes)
 // We will need to do this via an npm script bound to a client-like implementation
 // https://stackoverflow.com/a/29424685/5334305
