@@ -110,7 +110,7 @@ document.addEventListener('event:cancel-lobby', cancelMatch);
 document.addEventListener('event:play-card', playCard);
 document.addEventListener('event:rematch', rematch);
 document.addEventListener('event:end-demo', endDemo);
-document.addEventListener('event:rewatch-demo', rewatchDemo);
+// document.addEventListener('event:rewatch-demo', rewatchDemo);
 document.addEventListener('event:watch-another-demo', watchAnotherDemo);
 
 socket.emit("request game list");
@@ -424,17 +424,17 @@ function endDemo () {
 }
 
 // Re-watch the same DEMO match.
-function rewatchDemo () {
-	if (matchId === "DEMO") {
-		window.location.reload();
-	}
-}
+// function rewatchDemo () {
+// 	if (matchId === "DEMO") {
+// 		window.location.reload();
+// 	}
+// }
 
 // Watch a new DEMO match.
 function watchAnotherDemo () {
 	if (matchId === "DEMO") {
-		socket.emit("end");
-		window.location.reload();
+		socket.emit("request rematch");
+		setState('ingame')
 	}
 }
 

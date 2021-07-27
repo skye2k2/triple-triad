@@ -236,6 +236,7 @@ function createMatch (participants, lobby) {
 	let match = {
 		matchCount: 0,
 		matchId: lobby.matchId,
+		tiebreakerRounds: 0,
 		players: [],
 		rules: lobby.rules,
 		runningScore: {
@@ -364,10 +365,9 @@ function playerDisconnected (socket) {
 }
 
 function rematchRequested (socket) {
-	// TODO: Allow spectators to request a rematch for DEMO matches
 	var match = findMatchBySocketId(socket.id);
 	if (match) {
-		if ((match.rematch && match.rematch !== socket.id) || match.solo) {
+		if ((match.rematch && match.rematch !== socket.id) || match.solo || match.matchId === "DEMO") {
 			AI.gameplay.setMatchDefaults(match, true);
 			io.to(match.matchId).emit("update score", {scoreboard: match.scoreboard, runningScore: match.runningScore});
 			AI.gameplay.startNewRound(match);

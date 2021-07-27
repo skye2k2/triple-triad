@@ -299,6 +299,8 @@ let gameplay = {
 			match.scoreboard.blue++;
 		}
 
+		match.tiebreakerRounds = 0;
+
 		let redTotalScore = match.scoreboard.red;
 		let blueTotalScore = match.scoreboard.blue;
 
@@ -351,7 +353,7 @@ let gameplay = {
 	startNewRound: function (match, tiebreakerRound) {
 		io.updateMatchStatistics();
 		if (tiebreakerRound) {
-			this.log(`Begin Round ${match.roundNumber} Tiebreaker`, match);
+			this.log(`Begin Round ${match.roundNumber} Tiebreaker ${match.tiebreakerRounds}`, match);
 		} else {
 			match.roundNumber++;
 			this.log(`Begin Round ${match.roundNumber}`, match);
@@ -372,10 +374,20 @@ let gameplay = {
 					tier10: 1,
 				};
 
-				if (match.roundNumber !== 1) {
-					player.deck = this.generateDeck(powerDeckDistribution);
-				} else {
+				let tiebreakerDeckDistribution = {
+					tier2: 1,
+					tier4: 1,
+					tier6: 1,
+					tier8: 1,
+					tier10: 1,
+				};
+
+				if (match.roundNumber === 1) {
 					player.deck = this.generateDeck();
+				} else if (match.roundNumber === 2) {
+					player.deck = this.generateDeck(tiebreakerDeckDistribution);
+				} else if (match.roundNumber === 3) {
+					player.deck = this.generateDeck(powerDeckDistribution);
 				}
 			}
 			this.dealHand(player);
@@ -388,24 +400,6 @@ let gameplay = {
 		}
 
 		this.toggleActivePlayer(match);
-
-		// HARD-CODED TESTING
-		// setTimeout(() => {
-		// 	let activePlayer = (match.players[0].activePlayer) ? 0 : 1;
-		// 	let otherPlayer = (activePlayer === 0) ? 1 : 0;
-		// 	// HARD-CODED AI TESTING
-		// 	if (match.roundNumber < 4) {
-		// 		playAICard(AI.play(match, activePlayer));
-		// 		playAICard(AI.play(match, otherPlayer));
-		// 		playAICard(AI.play(match, activePlayer));
-		// 		playAICard(AI.play(match, otherPlayer));
-		// 		playAICard(AI.play(match, activePlayer));
-		// 		playAICard(AI.play(match, otherPlayer));
-		// 		playAICard(AI.play(match, activePlayer));
-		// 		playAICard(AI.play(match, otherPlayer));
-		// 		playAICard(AI.play(match, activePlayer));
-		// 	}
-		// }, 600);
 	},
 
 	/**
@@ -413,22 +407,31 @@ let gameplay = {
 	 * @returns {undefined} - Modifies match data directly, and calls out to start another round.
 	 */
 	tiebreaker: function (match) {
-		for (var i = 0; i < match.players.length; i++) {
-			let player = match.players[i];
-			let playerColor = player.color;
+		match.tiebreakerRounds++;
 
-			// Also give the unplayed card back to its owner
-			for (var j = 0; j < player.cards.length; j++) {
-				if (player.cards[j]) {
-					player.deck.unshift(player.cards[j]);
+		if (match.tiebreakerRounds === 1) {
+			for (var i = 0; i < match.players.length; i++) {
+				let player = match.players[i];
+				let playerColor = player.color;
+
+				// Also give the unplayed card back to its owner
+				for (var j = 0; j < player.cards.length; j++) {
+					if (player.cards[j]) {
+						player.deck.unshift(player.cards[j]);
+					}
 				}
-			}
 
-			// Loop through board and give each player the cards they currently own
-			match.board.map((row) => {row.map((space) => { if (space.color === playerColor) {
-				match.players[i].deck.unshift(space.card);
-			}});});
+				// Loop through board and give each player the cards they currently own
+				match.board.map((row) => {row.map((space) => { if (space.color === playerColor) {
+					match.players[i].deck.unshift(space.card);
+				}});});
+			}
+		} else {
+			// Help avoid tiebreaker gridlock--completely re-deal
+				match.players[0].deck = []
+				match.players[1].deck = []
 		}
+
 		this.startNewRound(match, true);
 	},
 
